@@ -44,3 +44,4 @@ obsidx-rebuild
 
 # OS
 .DS_Store
+bin/*
