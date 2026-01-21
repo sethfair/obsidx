@@ -88,13 +88,18 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 	// Insert new chunks and embeddings
 	for i, chunk := range chunks {
 		storeChunk := &store.Chunk{
-			Path:          path,
-			HeadingPath:   chunk.HeadingPath,
-			ChunkIndex:    chunk.ChunkIndex,
-			Content:       chunk.Content,
-			ContentSHA256: chunker.ComputeContentHash(chunk.Content),
-			StartLine:     chunk.StartLine,
-			EndLine:       chunk.EndLine,
+			Path:           path,
+			HeadingPath:    chunk.HeadingPath,
+			ChunkIndex:     chunk.ChunkIndex,
+			Content:        chunk.Content,
+			ContentSHA256:  chunker.ComputeContentHash(chunk.Content),
+			StartLine:      chunk.StartLine,
+			EndLine:        chunk.EndLine,
+			Category:       chunk.Category,
+			Status:         chunk.Status,
+			Scope:          chunk.Scope,
+			NoteType:       chunk.NoteType,
+			CategoryWeight: chunk.CategoryWeight,
 		}
 
 		chunkID, err := idx.store.InsertChunk(ctx, tx, storeChunk)

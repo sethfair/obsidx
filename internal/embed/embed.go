@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-// Embedder is the interface for embedding text into vectors
+// Embedder converts text into vector embeddings using Ollama
 type Embedder interface {
 	// Embed converts text into a vector
 	Embed(ctx context.Context, text string) ([]float32, error)
@@ -14,12 +14,7 @@ type Embedder interface {
 
 	// ModelName returns the model identifier
 	ModelName() string
-}
 
-// BatchEmbedder can embed multiple texts in one call (optional optimization)
-type BatchEmbedder interface {
-	Embedder
-
-	// EmbedBatch embeds multiple texts efficiently
-	EmbedBatch(ctx context.Context, texts []string) ([][]float32, error)
+	// Ping checks if the embedding service is available
+	Ping(ctx context.Context) error
 }

@@ -14,6 +14,12 @@ type Chunk struct {
 	ChunkIndex  int
 	StartLine   int
 	EndLine     int
+	// Metadata inherited from note
+	Category       string
+	Status         string
+	Scope          string
+	NoteType       string
+	CategoryWeight float32
 }
 
 // ChunkMarkdown splits markdown into semantic chunks

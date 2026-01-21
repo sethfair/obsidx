@@ -40,4 +40,8 @@ CREATE TABLE IF NOT EXISTS index_meta (
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_chunks_path ON chunks(path);
 CREATE INDEX IF NOT EXISTS idx_chunks_active ON chunks(active);
+CREATE INDEX IF NOT EXISTS idx_chunks_category ON chunks(category);
+CREATE INDEX IF NOT EXISTS idx_chunks_status ON chunks(status);
+CREATE INDEX IF NOT EXISTS idx_chunks_canon ON chunks(canon);
+CREATE INDEX IF NOT EXISTS idx_chunks_category_active ON chunks(category, active);
 CREATE INDEX IF NOT EXISTS idx_files_mtime ON files(mtime_unix);

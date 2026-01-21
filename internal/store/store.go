@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -42,6 +43,13 @@ type Chunk struct {
 	EndLine       int
 	Active        bool
 	CreatedAtUnix int64
+	// Category system
+	Category       string
+	Status         string
+	Scope          string
+	NoteType       string
+	CategoryWeight float32
+	Canon          bool
 }
 
 // Embedding represents a vector embedding
@@ -128,12 +136,19 @@ func (s *SQLite) InsertChunk(ctx context.Context, tx *sql.Tx, c *Chunk) (int64, 
 	c.CreatedAtUnix = time.Now().Unix()
 	c.Active = true
 
+	// Set canon flag from category
+	if c.Category == "canon" {
+		c.Canon = true
+	}
+
 	result, err := tx.ExecContext(ctx,
 		`INSERT INTO chunks (path, heading_path, chunk_index, content, content_sha256, 
-		                     start_line, end_line, active, created_at_unix)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		                     start_line, end_line, active, created_at_unix,
+		                     category, status, scope, note_type, category_weight, canon)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		c.Path, c.HeadingPath, c.ChunkIndex, c.Content, c.ContentSHA256,
 		c.StartLine, c.EndLine, 1, c.CreatedAtUnix,
+		c.Category, c.Status, c.Scope, c.NoteType, c.CategoryWeight, c.Canon,
 	)
 	if err != nil {
 		return 0, err
@@ -183,7 +198,8 @@ func (s *SQLite) GetChunksByIDs(ctx context.Context, ids []uint64) ([]ChunkWithE
 	// Build query with placeholders
 	query := `SELECT c.id, c.path, c.heading_path, c.chunk_index, c.content, 
 	                 c.content_sha256, c.start_line, c.end_line, c.active, 
-	                 c.created_at_unix, e.dim, e.vec
+	                 c.created_at_unix, c.category, c.status, c.scope, c.note_type,
+	                 c.category_weight, c.canon, e.dim, e.vec
 	          FROM chunks c
 	          JOIN embeddings e ON c.id = e.chunk_id
 	          WHERE c.active = 1 AND c.id IN (`
@@ -210,17 +226,20 @@ func (s *SQLite) GetChunksByIDs(ctx context.Context, ids []uint64) ([]ChunkWithE
 		var vecBlob []byte
 		var dim int
 		var active int
+		var canon int
 
 		err := rows.Scan(
 			&cwe.ID, &cwe.Path, &cwe.HeadingPath, &cwe.ChunkIndex, &cwe.Content,
 			&cwe.ContentSHA256, &cwe.StartLine, &cwe.EndLine, &active,
-			&cwe.CreatedAtUnix, &dim, &vecBlob,
+			&cwe.CreatedAtUnix, &cwe.Category, &cwe.Status, &cwe.Scope, &cwe.NoteType,
+			&cwe.CategoryWeight, &canon, &dim, &vecBlob,
 		)
 		if err != nil {
 			return nil, err
 		}
 
 		cwe.Active = active == 1
+		cwe.Canon = canon == 1
 		vec, err := BytesToFloat32(vecBlob)
 		if err != nil {
 			return nil, fmt.Errorf("decode vec for chunk %d: %w", cwe.ID, err)
@@ -299,4 +318,90 @@ func (s *SQLite) GetIndexMetaInt(ctx context.Context, key string) (int, error) {
 		return 0, err
 	}
 	return strconv.Atoi(val)
+}
+
+// GetCanonChunkIDs fetches only canon chunk IDs for priority retrieval
+func (s *SQLite) GetCanonChunkIDs(ctx context.Context, limit int) ([]uint64, error) {
+	query := `SELECT id FROM chunks 
+	          WHERE active = 1 AND category = 'canon' AND status = 'active'
+	          ORDER BY id
+	          LIMIT ?`
+
+	rows, err := s.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []uint64
+	for rows.Next() {
+		var id uint64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// GetChunkIDsByCategory fetches chunk IDs filtered by category
+func (s *SQLite) GetChunkIDsByCategory(ctx context.Context, categories []string, limit int) ([]uint64, error) {
+	if len(categories) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, len(categories))
+	args := make([]interface{}, len(categories)+1)
+	for i, cat := range categories {
+		placeholders[i] = "?"
+		args[i] = cat
+	}
+	args[len(categories)] = limit
+
+	query := fmt.Sprintf(`SELECT id FROM chunks 
+	                      WHERE active = 1 AND category IN (%s) 
+	                      AND status IN ('active', 'draft')
+	                      ORDER BY category_weight DESC, id
+	                      LIMIT ?`,
+		strings.Join(placeholders, ","))
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []uint64
+	for rows.Next() {
+		var id uint64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// StreamActiveEmbeddingsByCategory streams embeddings filtered by category
+func (s *SQLite) StreamActiveEmbeddingsByCategory(ctx context.Context, categories []string) (*sql.Rows, error) {
+	if len(categories) == 0 {
+		return s.StreamActiveEmbeddings(ctx)
+	}
+
+	placeholders := make([]string, len(categories))
+	args := make([]interface{}, len(categories))
+	for i, cat := range categories {
+		placeholders[i] = "?"
+		args[i] = cat
+	}
+
+	query := fmt.Sprintf(`SELECT c.id, e.vec 
+	                      FROM chunks c
+	                      JOIN embeddings e ON c.id = e.chunk_id
+	                      WHERE c.active = 1 AND c.category IN (%s)
+	                      AND c.status IN ('active', 'draft')
+	                      ORDER BY c.id`,
+		strings.Join(placeholders, ","))
+
+	return s.db.QueryContext(ctx, query, args...)
 }

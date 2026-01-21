@@ -35,17 +35,23 @@ func CosineSimilarity(a, b []float32) float32 {
 }
 
 // RerankCosine reranks chunks by exact cosine similarity and returns top N
+// Applies category weights for tiered retrieval
 func RerankCosine(queryVec []float32, chunks []store.ChunkWithEmbedding, topN int) []Result {
 	if len(chunks) == 0 {
 		return nil
 	}
 
-	// Compute all scores
+	// Compute all scores with category weighting
 	scores := make([]Result, len(chunks))
 	for i, chunk := range chunks {
+		baseSimilarity := CosineSimilarity(queryVec, chunk.Vec)
+
+		// Apply category weight (canon gets 1.20x, workbench gets 0.90x, etc.)
+		weightedScore := baseSimilarity * chunk.CategoryWeight
+
 		scores[i] = Result{
 			Chunk: chunk,
-			Score: CosineSimilarity(queryVec, chunk.Vec),
+			Score: weightedScore,
 		}
 	}
 
