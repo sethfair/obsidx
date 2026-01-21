@@ -43,7 +43,7 @@ Use obsidx for:
 Execute this command to search the knowledge base:
 
 \`\`\`bash
-/Users/seth/code/obsidx/bin/obsidx-recall --json "<search query>" | head -c 2000
+/Users/yourname/code/obsidx/bin/obsidx-recall --json "<search query>" | head -c 2000
 \`\`\`
 
 **Important:** Always run this BEFORE providing answers about:
@@ -482,7 +482,7 @@ ls ~/code/obsidx/bin/obsidx-recall
 export PATH="$HOME/code/obsidx/bin:$PATH"
 
 # Or use full path in instructions
-/Users/seth/code/obsidx/bin/obsidx-recall
+/Users/yourname/code/obsidx/bin/obsidx-recall
 ```
 
 ### No Results Returned

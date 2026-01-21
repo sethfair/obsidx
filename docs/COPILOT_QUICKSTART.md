@@ -165,13 +165,13 @@ Would you like me to draft it?"
 1. ✅ Copy `.github/copilot-instructions.md` to your projects
 2. ✅ Test with a few queries
 3. ✅ Refine instructions based on Copilot's behavior
-4. 📚 Read full guide: [docs/COPILOT_SETUP.md](COPILOT_SETUP.md)
+4. 📚 Read full guide: [COPILOT_GUIDE.md](COPILOT_GUIDE.md)
 
 ## Support
 
-- Full setup guide: `docs/COPILOT_SETUP.md`
-- Category system: `docs/CATEGORY_SYSTEM.md`
-- Knowledge governance: `docs/setup.md`
+- Full setup guide: [COPILOT_GUIDE.md](COPILOT_GUIDE.md)
+- Knowledge governance: [KNOWLEDGE_GOVERNANCE.md](KNOWLEDGE_GOVERNANCE.md)
+- Retrieval commands: [RETRIEVAL.md](RETRIEVAL.md)
 
 ---
 

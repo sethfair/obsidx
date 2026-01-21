@@ -4,7 +4,7 @@ import (
 	"container/heap"
 	"math"
 
-	"github.com/seth/obsidx/internal/store"
+	"github.com/sethfair/obsidx/internal/store"
 )
 
 // Result represents a ranked search result

@@ -8,7 +8,7 @@ import (
 // NoteMetadata represents extracted front matter
 type NoteMetadata struct {
 	Category     string // canon, project, workbench, archive
-	Scope        string // writerflow, ventio, personal, etc.
+	Scope        string // mycompany, myproject, personal, etc.
 	Type         string // decision, principle, vision, spec, note, log, glossary
 	Status       string // active, draft, superseded, deprecated
 	LastReviewed time.Time

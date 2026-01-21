@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/seth/obsidx/internal/ann"
-	"github.com/seth/obsidx/internal/chunker"
-	"github.com/seth/obsidx/internal/embed"
-	"github.com/seth/obsidx/internal/metadata"
-	"github.com/seth/obsidx/internal/store"
+	"github.com/sethfair/obsidx/internal/ann"
+	"github.com/sethfair/obsidx/internal/chunker"
+	"github.com/sethfair/obsidx/internal/embed"
+	"github.com/sethfair/obsidx/internal/metadata"
+	"github.com/sethfair/obsidx/internal/store"
 )
 
 // Indexer manages the indexing process

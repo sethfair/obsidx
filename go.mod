@@ -1,4 +1,4 @@
-module github.com/seth/obsidx
+module github.com/sethfair/obsidx
 
 go 1.22
 

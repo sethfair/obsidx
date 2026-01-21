@@ -178,7 +178,7 @@ Add front matter to your notes:
 ```yaml
 ---
 category: canon        # canon | project | workbench | archive
-scope: writerflow      # your domain/project
+scope: mycompany      # your domain/project
 type: decision         # decision | principle | vision | spec | note | log
 status: active         # active | draft | superseded | deprecated
 last_reviewed: 2026-01-20
@@ -302,7 +302,7 @@ Found 3 results:
 [1] Score: 0.8745 [📚 CANON]
 Path: /canon/decisions/ADR-003-Rate-Limiting.md
 Section: Decision > Implementation
-Scope: writerflow
+Scope: mycompany
 Lines: 15-42
 
 We use token bucket rate limiting with Redis backing.
@@ -346,7 +346,7 @@ Create architectural decisions as canon:
 ```yaml
 ---
 category: canon
-scope: writerflow
+scope: mycompany
 type: decision
 status: active
 last_reviewed: 2026-01-20
@@ -530,7 +530,7 @@ Configure Copilot to use obsidx as your knowledge source:
 ~/code/obsidx/bin/obsidx-recall --json "your query" | head -c 2000
 ```
 
-**Full Setup Guide:** See [docs/COPILOT_SETUP.md](docs/COPILOT_SETUP.md)
+**Full Setup Guide:** See [docs/COPILOT_GUIDE.md](docs/COPILOT_GUIDE.md)
 
 ### Example Workflow
 
@@ -585,9 +585,11 @@ Before generating any code or architectural decisions:
 
 ## Documentation
 
-- **[Category System Guide](docs/CATEGORY_SYSTEM.md)** - Full metadata reference and retrieval behavior
-- **[Setup Guide](docs/setup.md)** - Knowledge governance workflow and best practices
-- Architecture decisions (see ADRs in your vault)
+- **[docs/README.md](docs/README.md)** - Documentation index and navigation
+- **[Knowledge Governance Guide](docs/KNOWLEDGE_GOVERNANCE.md)** - Metadata system, categories, and lifecycle management
+- **[Retrieval Guide](docs/RETRIEVAL.md)** - Search commands, filters, and usage patterns
+- **[Copilot Quick Start](docs/COPILOT_QUICKSTART.md)** - 2-minute GitHub Copilot integration
+- **[Copilot Guide](docs/COPILOT_GUIDE.md)** - Complete AI integration reference
 
 ## FAQ
 
