@@ -15,6 +15,29 @@
   - ADR pattern for architectural decisions
   - Promotion workflow from draft to canon
 
+## Database & Storage
+
+**Database Location:** `.obsidian-index/obsidx.db` (SQLite database in current directory)
+
+obsidx uses **SQLite** for local storage - there is no server to run. The database file is created automatically when you run the indexer:
+
+```bash
+# Database is created in current directory as:
+.obsidian-index/
+├── obsidx.db           # SQLite database (chunks + metadata)
+└── hnsw/               # HNSW index files (optional, rebuilt from SQLite)
+```
+
+**Key Points:**
+- **No server process** - SQLite is embedded in the binaries
+- **Portable** - Copy `.obsidian-index/` to move your index
+- **Local storage** - All data stays on your machine
+- **Single writer** - Only run one indexer per vault at a time
+- **Multiple readers** - Can run many search queries concurrently
+
+**Default Location:** Current working directory  
+**Custom Location:** Use `--db /path/to/obsidx.db` flag with any command
+
 ## Usage Guides
 
 - **[RETRIEVAL.md](RETRIEVAL.md)** - How to search and retrieve knowledge
@@ -25,19 +48,17 @@
 
 ## AI Integration
 
-- **[COPILOT_QUICKSTART.md](COPILOT_QUICKSTART.md)** - 2-minute setup for GitHub Copilot (both methods)
-- **[MCP_SETUP.md](MCP_SETUP.md)** - Complete guide for MCP tool configuration
+- **[COPILOT_QUICKSTART.md](COPILOT_QUICKSTART.md)** - 2-minute setup for GitHub Copilot
 - **[COPILOT_GUIDE.md](COPILOT_GUIDE.md)** - Complete AI integration reference
 
 ## Documentation Status
 
 | Document | Lines | Purpose | Audience |
 |----------|-------|---------|----------|
-| README.md (root) | ~625 | Project overview, quick start | All users |
+| README.md (root) | ~660 | Project overview, quick start | All users |
 | KNOWLEDGE_GOVERNANCE.md | ~500 | Metadata system, lifecycle | Knowledge managers |
 | RETRIEVAL.md | ~580 | Search and filtering | End users |
-| COPILOT_QUICKSTART.md | ~180 | Fast Copilot setup (both methods) | Developers |
-| MCP_SETUP.md | ~400 | Complete MCP tool configuration | CLI users |
+| COPILOT_QUICKSTART.md | ~180 | Fast Copilot setup | Developers |
 | COPILOT_GUIDE.md | ~600 | Complete AI integration | Power users |
 
 ---

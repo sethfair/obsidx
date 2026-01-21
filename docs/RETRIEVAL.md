@@ -430,80 +430,49 @@ obsidx-recall --exclude-archive=false "the"
 
 ## Integration Examples
 
-### GitHub Copilot CLI (via MCP)
+### GitHub Copilot CLI
 
-obsidx can be configured as a tool in GitHub Copilot CLI using the Model Context Protocol (MCP).
+GitHub Copilot CLI can use obsidx through instruction-based tool invocation. There are two approaches:
 
-**Setup:**
+#### Approach 1: Shell Alias (Recommended)
 
-1. **Ensure obsidx is installed and indexed:**
-   ```bash
-   cd ~/code/obsidx
-   ./run.sh ~/notes  # Index your vault
-   ```
-
-2. **Add obsidx MCP configuration:**
-   
-   Edit your MCP settings file (location varies by OS):
-   - **macOS:** `~/Library/Application Support/github-copilot-cli/config.json`
-   - **Linux:** `~/.config/github-copilot-cli/config.json`
-   - **Windows:** `%APPDATA%\github-copilot-cli\config.json`
-
-   Add obsidx as a tool:
-   ```json
-   {
-     "tools": {
-       "obsidx": {
-         "command": "/Users/seth/code/obsidx/bin/obsidx-recall",
-         "description": "Search Obsidian vault for authoritative decisions and documentation",
-         "parameters": {
-           "query": {
-             "type": "string",
-             "description": "Search query",
-             "required": true
-           },
-           "canon-only": {
-             "type": "boolean",
-             "description": "Search only canon (authoritative) notes",
-             "default": false
-           },
-           "category": {
-             "type": "string",
-             "description": "Filter by categories (comma-separated: canon,project,workbench,archive)"
-           },
-           "json": {
-             "type": "boolean",
-             "description": "Output as JSON",
-             "default": true
-           }
-         }
-       }
-     }
-   }
-   ```
-
-3. **Restart GitHub Copilot CLI**
-
-**Usage in Copilot CLI:**
-
-Once configured, Copilot CLI can automatically call obsidx when you ask questions:
+Create a shell alias that Copilot can reference:
 
 ```bash
-# Copilot will automatically search your vault for relevant context
-gh copilot suggest "implement authentication based on our standards"
+# Add to ~/.zshrc or ~/.bashrc
+alias kb='~/code/obsidx/bin/obsidx-recall'
+alias kb-canon='~/code/obsidx/bin/obsidx-recall --canon-only'
+alias kb-json='~/code/obsidx/bin/obsidx-recall --json'
 
-# Copilot will call: obsidx-recall --canon-only "authentication"
-# Then generate code based on your documented approach
+# Reload shell
+source ~/.zshrc
 ```
 
-**Example conversation:**
-```
-You: How should we handle rate limiting?
+Then use in terminal:
+```bash
+# Search before asking Copilot
+kb-canon "authentication strategy"
 
-Copilot: [calls obsidx-recall --canon-only "rate limiting"]
-Copilot: Based on ADR-003 in your knowledge base, you use token bucket 
-         rate limiting with Redis. Here's the implementation...
+# Then ask Copilot based on results
+gh copilot suggest "implement authentication based on our docs"
 ```
+
+#### Approach 2: Direct Command
+
+Run obsidx before asking Copilot questions:
+
+```bash
+# Get context first
+~/code/obsidx/bin/obsidx-recall --canon-only "rate limiting"
+
+# Use results to inform your Copilot query
+gh copilot suggest "implement rate limiting using our documented approach"
+```
+
+**Note:** GitHub Copilot CLI does not automatically call external tools. You need to:
+1. Run obsidx-recall manually to get context
+2. Use that context to inform your Copilot questions
+3. Reference the found documentation in your prompts
 
 ### GitHub Copilot (Editor Instructions)
 

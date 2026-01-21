@@ -486,6 +486,66 @@ func normalizeCategory(cat string) string {
 
 Then update schema and weights.
 
+## Database Location & Storage
+
+**Where is the database?**
+
+obsidx uses **SQLite** - a local, embedded database with no server process. The database is stored in:
+
+```
+.obsidian-index/obsidx.db
+```
+
+This file is created in your **current working directory** when you run the indexer.
+
+**Example:**
+```bash
+# If you run from your home directory:
+cd ~
+./code/obsidx/run.sh ~/notes
+
+# Database is created at:
+~/.obsidian-index/obsidx.db
+```
+
+**Structure:**
+```
+.obsidian-index/
+├── obsidx.db           # SQLite database (all chunks + embeddings + metadata)
+└── hnsw/               # HNSW index files (rebuilt from SQLite as needed)
+```
+
+**Key Points:**
+- ✅ **No server** - SQLite is embedded in the binaries (no daemon, no service)
+- ✅ **Local storage** - All data stays on your machine
+- ✅ **Portable** - Copy `.obsidian-index/` folder to move your index
+- ✅ **Single writer** - Only run one indexer per vault at a time
+- ✅ **Multiple readers** - Run as many searches as you want concurrently
+
+**Custom Location:**
+
+Use the `--db` flag to specify a different location:
+
+```bash
+# Index to custom location
+./bin/obsidx-indexer --vault ~/notes --db /path/to/my-index.db --watch
+
+# Search from custom location
+./bin/obsidx-recall --db /path/to/my-index.db "your query"
+```
+
+**Multiple Vaults:**
+
+Each vault should have its own database:
+
+```bash
+# Vault 1
+./bin/obsidx-indexer --vault ~/work-notes --db ~/work-notes/.obsidian-index/obsidx.db --watch
+
+# Vault 2
+./bin/obsidx-indexer --vault ~/personal-notes --db ~/personal-notes/.obsidian-index/obsidx.db --watch
+```
+
 ## Database Schema
 
 ```sql
@@ -519,35 +579,23 @@ CREATE TABLE embeddings (
 
 ## GitHub Copilot Integration
 
-Configure Copilot to use obsidx as your knowledge source:
+Configure Copilot to use obsidx as your knowledge source through instruction files.
 
-**Two Integration Methods:**
+**How it works:**
+1. Add `.github/copilot-instructions.md` to your project
+2. Copilot reads the instructions and executes obsidx-recall commands
+3. Results from your vault inform Copilot's answers
+4. You get responses based on YOUR documented decisions, not generic advice
 
-1. **MCP Tool (Recommended for CLI)** - Configure obsidx as an automatic tool in GitHub Copilot CLI
-   - Seamless context retrieval
-   - No manual commands needed
-   - See [docs/COPILOT_QUICKSTART.md](docs/COPILOT_QUICKSTART.md) Method 1
-
-2. **Editor Instructions** - Use instruction files to guide Copilot behavior
-   - Works in any editor
-   - Flexible and simple
-   - See [docs/COPILOT_QUICKSTART.md](docs/COPILOT_QUICKSTART.md) Method 2
-
-**Quick Setup (MCP Tool):**
+**Quick Setup:**
 
 1. Index your vault: `./run.sh ~/notes`
-2. Copy example config: `cp .github/copilot-cli-mcp-config.json ~/Library/Application\ Support/github-copilot-cli/config.json`
-   - Or add to existing config file (see example in `.github/copilot-cli-mcp-config.json`)
-   - Update path to obsidx-recall if needed
-3. Restart Copilot CLI: `pkill -f "github-copilot-cli"`
-4. Test: `gh copilot suggest "what is our authentication strategy"`
+2. Copy instructions: `cp .github/copilot-instructions.md ~/.github/` (global)  
+   or `cp .github/copilot-instructions.md /path/to/project/.github/` (per-project)
+3. Add to PATH: `echo 'export PATH="$HOME/code/obsidx/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc`
+4. Test: Ask Copilot "what is our authentication strategy"
 
-**Quick Setup (Editor Instructions):**
-1. Copy `.github/copilot-instructions.md` to your project root
-2. Copilot will now search your knowledge base before answering
-
-
-**Full Setup Guide:** See [docs/COPILOT_GUIDE.md](docs/COPILOT_GUIDE.md)
+**Full Setup Guide:** See [docs/COPILOT_QUICKSTART.md](docs/COPILOT_QUICKSTART.md)
 
 ### Example Workflow
 
