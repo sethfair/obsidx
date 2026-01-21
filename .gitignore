@@ -32,9 +32,10 @@ go.work.sum
 *.db-shm
 *.db-wal
 .obsidian-index/
-obsidx-indexer
-obsidx-recall
-obsidx-rebuild
+/obsidx-indexer
+/obsidx-recall
+/obsidx-rebuild
+/obsidx-recall-server
 
 # Editor/IDE
 .idea/
