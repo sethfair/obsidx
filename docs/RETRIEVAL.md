@@ -430,7 +430,84 @@ obsidx-recall --exclude-archive=false "the"
 
 ## Integration Examples
 
-### GitHub Copilot
+### GitHub Copilot CLI (via MCP)
+
+obsidx can be configured as a tool in GitHub Copilot CLI using the Model Context Protocol (MCP).
+
+**Setup:**
+
+1. **Ensure obsidx is installed and indexed:**
+   ```bash
+   cd ~/code/obsidx
+   ./run.sh ~/notes  # Index your vault
+   ```
+
+2. **Add obsidx MCP configuration:**
+   
+   Edit your MCP settings file (location varies by OS):
+   - **macOS:** `~/Library/Application Support/github-copilot-cli/config.json`
+   - **Linux:** `~/.config/github-copilot-cli/config.json`
+   - **Windows:** `%APPDATA%\github-copilot-cli\config.json`
+
+   Add obsidx as a tool:
+   ```json
+   {
+     "tools": {
+       "obsidx": {
+         "command": "/Users/seth/code/obsidx/bin/obsidx-recall",
+         "description": "Search Obsidian vault for authoritative decisions and documentation",
+         "parameters": {
+           "query": {
+             "type": "string",
+             "description": "Search query",
+             "required": true
+           },
+           "canon-only": {
+             "type": "boolean",
+             "description": "Search only canon (authoritative) notes",
+             "default": false
+           },
+           "category": {
+             "type": "string",
+             "description": "Filter by categories (comma-separated: canon,project,workbench,archive)"
+           },
+           "json": {
+             "type": "boolean",
+             "description": "Output as JSON",
+             "default": true
+           }
+         }
+       }
+     }
+   }
+   ```
+
+3. **Restart GitHub Copilot CLI**
+
+**Usage in Copilot CLI:**
+
+Once configured, Copilot CLI can automatically call obsidx when you ask questions:
+
+```bash
+# Copilot will automatically search your vault for relevant context
+gh copilot suggest "implement authentication based on our standards"
+
+# Copilot will call: obsidx-recall --canon-only "authentication"
+# Then generate code based on your documented approach
+```
+
+**Example conversation:**
+```
+You: How should we handle rate limiting?
+
+Copilot: [calls obsidx-recall --canon-only "rate limiting"]
+Copilot: Based on ADR-003 in your knowledge base, you use token bucket 
+         rate limiting with Redis. Here's the implementation...
+```
+
+### GitHub Copilot (Editor Instructions)
+
+For in-editor GitHub Copilot, use instruction files:
 
 ```markdown
 Before answering, search knowledge base:

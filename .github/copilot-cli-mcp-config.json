@@ -1,0 +1,65 @@
+{
+  "mcpServers": {
+    "obsidx": {
+      "command": "/Users/seth/code/obsidx/bin/obsidx-recall",
+      "args": ["--json"],
+      "env": {},
+      "description": "Search Obsidian vault for authoritative decisions and documentation using obsidx semantic search"
+    }
+  },
+  "tools": {
+    "obsidx-search": {
+      "description": "Search knowledge base for established decisions, patterns, and documentation",
+      "parameters": {
+        "query": {
+          "type": "string",
+          "description": "The search query (use natural language or technical terms)",
+          "required": true
+        },
+        "canon_only": {
+          "type": "boolean",
+          "description": "Search only authoritative canon notes (ADRs, principles)",
+          "default": false
+        },
+        "category": {
+          "type": "string",
+          "description": "Filter by categories: canon, project, workbench, archive (comma-separated)",
+          "default": ""
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results to return",
+          "default": 10
+        }
+      },
+      "examples": [
+        {
+          "query": "authentication strategy",
+          "canon_only": true,
+          "description": "Find established authentication decisions"
+        },
+        {
+          "query": "rate limiting implementation",
+          "category": "project",
+          "description": "Find current rate limiting implementation"
+        },
+        {
+          "query": "database migration approach",
+          "canon_only": false,
+          "category": "canon,project",
+          "description": "Find both decisions and current implementation"
+        }
+      ]
+    },
+    "obsidx-canon": {
+      "description": "Search ONLY authoritative canon notes (shortcut for canon-only search)",
+      "parameters": {
+        "query": {
+          "type": "string",
+          "description": "The search query",
+          "required": true
+        }
+      }
+    }
+  }
+}

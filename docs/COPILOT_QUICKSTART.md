@@ -4,9 +4,87 @@
 
 Configures GitHub Copilot to search your Obsidian vault (via obsidx) **before** answering questions, ensuring it uses YOUR decisions and documentation instead of generic knowledge.
 
-## Setup (2 minutes)
+## Two Integration Methods
 
-### Option 1: Global Setup (All Projects)
+### Method 1: Copilot CLI Tool (Recommended)
+
+Configure obsidx as an MCP tool that Copilot CLI can call automatically.
+
+**Pros:** Seamless, automatic context retrieval  
+**Cons:** Requires GitHub Copilot CLI
+
+### Method 2: Editor Instructions
+
+Use instruction files to tell Copilot to run obsidx commands.
+
+**Pros:** Works with any editor  
+**Cons:** Requires manual command execution
+
+---
+
+## Method 1: Copilot CLI Tool Setup
+
+### Step 1: Index Your Vault
+
+```bash
+cd ~/code/obsidx
+./run.sh ~/notes  # Wait for initial indexing to complete
+```
+
+### Step 2: Configure MCP Tool
+
+Edit your Copilot CLI config file:
+
+**macOS:** `~/Library/Application Support/github-copilot-cli/config.json`  
+**Linux:** `~/.config/github-copilot-cli/config.json`  
+**Windows:** `%APPDATA%\github-copilot-cli\config.json`
+
+Add this configuration:
+
+```json
+{
+  "mcpServers": {
+    "obsidx": {
+      "command": "/Users/seth/code/obsidx/bin/obsidx-recall",
+      "args": ["--json"],
+      "env": {}
+    }
+  }
+}
+```
+
+**Note:** Adjust the path to match your obsidx installation.
+
+### Step 3: Restart Copilot CLI
+
+```bash
+# Kill any running Copilot CLI processes
+pkill -f "github-copilot-cli"
+
+# Test the integration
+gh copilot suggest "what is our authentication strategy"
+```
+
+### Step 4: Verify It Works
+
+Ask Copilot CLI a question about your documented knowledge:
+
+```bash
+gh copilot suggest "how do we handle rate limiting"
+```
+
+**Expected behavior:**
+- Copilot automatically calls obsidx to search your vault
+- Returns results based on your canon notes
+- Generates code/answers using YOUR documentation
+
+---
+
+## Method 2: Editor Instructions Setup
+
+### Option A: Global Setup (All Projects)
+
+### Option A: Global Setup (All Projects)
 
 Copy the template to your home directory:
 
@@ -14,7 +92,7 @@ Copy the template to your home directory:
 cp .github/copilot-instructions.md ~/.github/copilot-instructions.md
 ```
 
-### Option 2: Per-Project Setup
+### Option B: Per-Project Setup
 
 Copy to each project:
 
@@ -22,7 +100,7 @@ Copy to each project:
 cp .github/copilot-instructions.md /path/to/your/project/.github/
 ```
 
-## Verify It Works
+## Verify Method 2 Works
 
 Ask Copilot: **"What's our authentication strategy?"**
 
@@ -33,7 +111,95 @@ Ask Copilot: **"What's our authentication strategy?"**
 
 If it works: ✅ You're done!
 
+---
+
+## Comparison: CLI Tool vs Editor Instructions
+
+| Feature | CLI Tool (Method 1) | Editor Instructions (Method 2) |
+|---------|---------------------|--------------------------------|
+| **Setup complexity** | Moderate (JSON config) | Simple (copy file) |
+| **Automation** | Fully automatic | Requires Copilot to execute commands |
+| **Context retrieval** | Seamless | Manual command in instructions |
+| **Works with** | Copilot CLI only | Any editor with Copilot |
+| **Real-time updates** | Yes | Yes (if indexer running) |
+| **Best for** | CLI-heavy workflows | Editor-heavy workflows |
+
+**Recommendation:** Use Method 1 (CLI Tool) if you use `gh copilot` commands. Use Method 2 (Editor Instructions) if you primarily use Copilot in your editor.
+
 ## Common Issues
+
+### Method 1 (CLI Tool) Issues
+
+#### "Tool not available" or "obsidx not found"
+
+**Fix 1: Check config file location**
+
+Verify you edited the correct config file:
+```bash
+# macOS
+ls -la ~/Library/Application\ Support/github-copilot-cli/config.json
+
+# Linux
+ls -la ~/.config/github-copilot-cli/config.json
+```
+
+**Fix 2: Verify JSON syntax**
+
+Your config must be valid JSON. Use a JSON validator or:
+```bash
+cat ~/Library/Application\ Support/github-copilot-cli/config.json | jq .
+```
+
+**Fix 3: Check binary path**
+
+Ensure the path to obsidx-recall is correct:
+```bash
+ls -la /Users/seth/code/obsidx/bin/obsidx-recall
+```
+
+Update config with your actual path if different.
+
+**Fix 4: Restart Copilot CLI**
+
+```bash
+# Kill all Copilot CLI processes
+pkill -f "github-copilot-cli"
+
+# Try again
+gh copilot suggest "test query"
+```
+
+#### "Command not found: obsidx-recall"
+
+**Fix:** Add obsidx to PATH or use absolute path in config
+
+```bash
+# Option 1: Add to PATH (recommended)
+echo 'export PATH="$HOME/code/obsidx/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Option 2: Use absolute path in config.json
+{
+  "mcpServers": {
+    "obsidx": {
+      "command": "/Users/seth/code/obsidx/bin/obsidx-recall",
+      ...
+    }
+  }
+}
+```
+
+#### "No results returned"
+
+**Fix:** Make sure indexer has run
+
+```bash
+cd ~/code/obsidx
+./run.sh ~/notes
+# Wait for "✓ Initial index complete"
+```
+
+### Method 2 (Editor Instructions) Issues
 
 ### "Command not found: obsidx-recall"
 

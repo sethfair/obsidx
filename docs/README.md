@@ -25,17 +25,19 @@
 
 ## AI Integration
 
-- **[COPILOT_QUICKSTART.md](COPILOT_QUICKSTART.md)** - 2-minute setup for GitHub Copilot
-- **[COPILOT_GUIDE.md](COPILOT_GUIDE.md)** - Complete integration guide and best practices
+- **[COPILOT_QUICKSTART.md](COPILOT_QUICKSTART.md)** - 2-minute setup for GitHub Copilot (both methods)
+- **[MCP_SETUP.md](MCP_SETUP.md)** - Complete guide for MCP tool configuration
+- **[COPILOT_GUIDE.md](COPILOT_GUIDE.md)** - Complete AI integration reference
 
 ## Documentation Status
 
 | Document | Lines | Purpose | Audience |
 |----------|-------|---------|----------|
 | README.md (root) | ~625 | Project overview, quick start | All users |
-| KNOWLEDGE_GOVERNANCE.md | ~260 | Metadata system, lifecycle | Knowledge managers |
-| RETRIEVAL.md | ~150 | Search and filtering | End users |
-| COPILOT_QUICKSTART.md | ~180 | Fast Copilot setup | Developers |
+| KNOWLEDGE_GOVERNANCE.md | ~500 | Metadata system, lifecycle | Knowledge managers |
+| RETRIEVAL.md | ~580 | Search and filtering | End users |
+| COPILOT_QUICKSTART.md | ~180 | Fast Copilot setup (both methods) | Developers |
+| MCP_SETUP.md | ~400 | Complete MCP tool configuration | CLI users |
 | COPILOT_GUIDE.md | ~600 | Complete AI integration | Power users |
 
 ---

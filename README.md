@@ -521,14 +521,31 @@ CREATE TABLE embeddings (
 
 Configure Copilot to use obsidx as your knowledge source:
 
-**Quick Setup:**
+**Two Integration Methods:**
+
+1. **MCP Tool (Recommended for CLI)** - Configure obsidx as an automatic tool in GitHub Copilot CLI
+   - Seamless context retrieval
+   - No manual commands needed
+   - See [docs/COPILOT_QUICKSTART.md](docs/COPILOT_QUICKSTART.md) Method 1
+
+2. **Editor Instructions** - Use instruction files to guide Copilot behavior
+   - Works in any editor
+   - Flexible and simple
+   - See [docs/COPILOT_QUICKSTART.md](docs/COPILOT_QUICKSTART.md) Method 2
+
+**Quick Setup (MCP Tool):**
+
+1. Index your vault: `./run.sh ~/notes`
+2. Copy example config: `cp .github/copilot-cli-mcp-config.json ~/Library/Application\ Support/github-copilot-cli/config.json`
+   - Or add to existing config file (see example in `.github/copilot-cli-mcp-config.json`)
+   - Update path to obsidx-recall if needed
+3. Restart Copilot CLI: `pkill -f "github-copilot-cli"`
+4. Test: `gh copilot suggest "what is our authentication strategy"`
+
+**Quick Setup (Editor Instructions):**
 1. Copy `.github/copilot-instructions.md` to your project root
 2. Copilot will now search your knowledge base before answering
 
-**Key Command:**
-```bash
-~/code/obsidx/bin/obsidx-recall --json "your query" | head -c 2000
-```
 
 **Full Setup Guide:** See [docs/COPILOT_GUIDE.md](docs/COPILOT_GUIDE.md)
 
