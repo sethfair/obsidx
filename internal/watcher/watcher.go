@@ -2,6 +2,8 @@ package watcher
 
 import (
 	"context"
+	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -32,13 +34,10 @@ func New(onChange func(path string), debounce time.Duration) (*FileWatcher, erro
 
 // Watch starts watching a directory recursively
 func (fw *FileWatcher) Watch(ctx context.Context, rootDir string) error {
-	// Add root directory
-	if err := fw.watcher.Add(rootDir); err != nil {
+	// Recursively add all directories
+	if err := fw.addRecursive(rootDir); err != nil {
 		return err
 	}
-
-	// Add all subdirectories
-	// TODO: walk subdirectories and add them
 
 	// Debounce map: path -> timer
 	pending := make(map[string]*time.Timer)
@@ -51,6 +50,16 @@ func (fw *FileWatcher) Watch(ctx context.Context, rootDir string) error {
 		case event, ok := <-fw.watcher.Events:
 			if !ok {
 				return nil
+			}
+
+			// Handle directory creation (need to add to watcher)
+			if event.Op&fsnotify.Create == fsnotify.Create {
+				info, err := os.Stat(event.Name)
+				if err == nil && info.IsDir() {
+					if err := fw.addRecursive(event.Name); err != nil {
+						log.Printf("Error adding new directory to watch: %v\n", err)
+					}
+				}
 			}
 
 			// Only care about markdown files
@@ -81,10 +90,30 @@ func (fw *FileWatcher) Watch(ctx context.Context, rootDir string) error {
 			if !ok {
 				return nil
 			}
-			// Log error but continue watching
-			_ = err
+			log.Printf("Watcher error: %v\n", err)
 		}
 	}
+}
+
+// addRecursive recursively adds a directory and all subdirectories to the watcher
+func (fw *FileWatcher) addRecursive(root string) error {
+	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip hidden directories (starting with .)
+		if info.IsDir() && strings.HasPrefix(info.Name(), ".") && path != root {
+			return filepath.SkipDir
+		}
+
+		if info.IsDir() {
+			if err := fw.watcher.Add(path); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // Close closes the watcher

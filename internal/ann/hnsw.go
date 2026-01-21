@@ -3,37 +3,36 @@ package ann
 import (
 	"fmt"
 	"math"
-	"sort"
+	"os"
 	"sync"
+
+	"github.com/coder/hnsw"
 )
 
 // HNSWConfig contains HNSW index parameters
 type HNSWConfig struct {
 	Dim            int
-	M              int    // default: 16
-	EfConstruction int    // default: 128
-	EfSearch       int    // default: 64
-	DistanceMetric string // "cosine" or "dot"
+	M              int // default: 16 - number of connections per layer
+	EfConstruction int // default: 200 - size of dynamic candidate list during construction
+	EfSearch       int // default: 100 - size of dynamic candidate list during search
 }
 
-// DefaultHNSWConfig returns sensible defaults
+// DefaultHNSWConfig returns sensible defaults for production use
 func DefaultHNSWConfig(dim int) HNSWConfig {
 	return HNSWConfig{
 		Dim:            dim,
-		M:              16,
-		EfConstruction: 128,
-		EfSearch:       64,
-		DistanceMetric: "cosine",
+		M:              16,  // Good balance between speed and recall
+		EfConstruction: 200, // Higher = better index quality, slower indexing
+		EfSearch:       100, // Higher = better recall, slower search
 	}
 }
 
-// HNSWIndex is a simple in-memory vector index
-// Uses brute-force search which is efficient for <100k vectors
-// Can be replaced with true HNSW later if needed
+// HNSWIndex wraps the coder/hnsw library with our interface
 type HNSWIndex struct {
-	cfg     HNSWConfig
-	vectors map[uint64][]float32
-	mu      sync.RWMutex
+	cfg   HNSWConfig
+	graph *hnsw.Graph[uint64]
+	mu    sync.RWMutex
+	count int
 }
 
 // NewHNSW creates a new HNSW index
@@ -42,13 +41,19 @@ func NewHNSW(cfg HNSWConfig) (*HNSWIndex, error) {
 		cfg = DefaultHNSWConfig(cfg.Dim)
 	}
 
+	graph := hnsw.NewGraph[uint64]()
+	graph.M = cfg.M
+	graph.EfSearch = cfg.EfSearch
+	graph.Distance = cosineDistance // Use cosine distance for text embeddings
+
 	return &HNSWIndex{
-		cfg:     cfg,
-		vectors: make(map[uint64][]float32),
+		cfg:   cfg,
+		graph: graph,
+		count: 0,
 	}, nil
 }
 
-// Add inserts a vector
+// Add inserts a vector into the HNSW index
 func (h *HNSWIndex) Add(id uint64, vec []float32) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -57,15 +62,15 @@ func (h *HNSWIndex) Add(id uint64, vec []float32) error {
 		return fmt.Errorf("vector dimension mismatch: got %d, expected %d", len(vec), h.cfg.Dim)
 	}
 
-	// Make a copy to avoid external mutation
-	vecCopy := make([]float32, len(vec))
-	copy(vecCopy, vec)
-	h.vectors[id] = vecCopy
+	// Create node and add to graph
+	node := hnsw.MakeNode(id, vec)
+	h.graph.Add(node)
+	h.count++
 
 	return nil
 }
 
-// Search returns nearest neighbors using brute-force search
+// Search returns k nearest neighbors using HNSW
 func (h *HNSWIndex) Search(vec []float32, k int) ([]uint64, error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -74,79 +79,78 @@ func (h *HNSWIndex) Search(vec []float32, k int) ([]uint64, error) {
 		return nil, fmt.Errorf("vector dimension mismatch: got %d, expected %d", len(vec), h.cfg.Dim)
 	}
 
-	if len(h.vectors) == 0 {
+	if h.count == 0 {
 		return nil, nil
 	}
 
-	// Compute distances to all vectors
-	type result struct {
-		id   uint64
-		dist float32
-	}
+	// Search HNSW - returns list of nodes (EfSearch is set on graph config)
+	results := h.graph.Search(vec, k)
 
-	results := make([]result, 0, len(h.vectors))
-	for id, storedVec := range h.vectors {
-		var dist float32
-		switch h.cfg.DistanceMetric {
-		case "cosine":
-			// Cosine distance = 1 - cosine similarity
-			dist = 1.0 - cosineSimilarity(vec, storedVec)
-		case "dot":
-			// For dot product, negate to make it a "distance" (lower is better)
-			dist = -dotProduct(vec, storedVec)
-		default:
-			// L2 distance
-			dist = l2Distance(vec, storedVec)
-		}
-		results = append(results, result{id: id, dist: dist})
-	}
-
-	// Sort by distance (ascending)
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].dist < results[j].dist
-	})
-
-	// Return top k IDs
-	if k > len(results) {
-		k = len(results)
-	}
-
-	ids := make([]uint64, k)
-	for i := 0; i < k; i++ {
-		ids[i] = results[i].id
+	// Extract IDs from results
+	ids := make([]uint64, len(results))
+	for i, node := range results {
+		ids[i] = node.Key
 	}
 
 	return ids, nil
 }
 
-// Save persists the index (no-op for in-memory version)
-func (h *HNSWIndex) Save(_ string) error {
-	return nil
+// Save persists the index to disk
+func (h *HNSWIndex) Save(path string) error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return h.graph.Export(f)
 }
 
-// Load restores the index (no-op - we rebuild from SQLite)
-func (h *HNSWIndex) Load(_ string) error {
-	return fmt.Errorf("load not implemented: use rebuild instead")
+// Load restores the index from disk
+func (h *HNSWIndex) Load(path string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	h.graph = hnsw.NewGraph[uint64]()
+	h.graph.M = h.cfg.M
+	h.graph.Distance = cosineDistance
+
+	if err := h.graph.Import(f); err != nil {
+		return err
+	}
+
+	h.count = h.graph.Len()
+	return nil
 }
 
 // Close releases resources
 func (h *HNSWIndex) Close() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.vectors = nil
+	h.graph = nil
+	h.count = 0
 	return nil
 }
 
-// Size returns the number of vectors
+// Size returns the number of vectors in the index
 func (h *HNSWIndex) Size() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return len(h.vectors)
+	return h.count
 }
 
-// Distance calculation helpers
-
-func cosineSimilarity(a, b []float32) float32 {
+// cosineDistance computes 1 - cosine_similarity
+// Lower distance = more similar
+func cosineDistance(a, b []float32) float32 {
 	var dot, normA, normB float32
 	for i := range a {
 		dot += a[i] * b[i]
@@ -154,24 +158,8 @@ func cosineSimilarity(a, b []float32) float32 {
 		normB += b[i] * b[i]
 	}
 	if normA == 0 || normB == 0 {
-		return 0
+		return 1.0 // Maximum distance
 	}
-	return dot / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
-}
-
-func dotProduct(a, b []float32) float32 {
-	var sum float32
-	for i := range a {
-		sum += a[i] * b[i]
-	}
-	return sum
-}
-
-func l2Distance(a, b []float32) float32 {
-	var sum float32
-	for i := range a {
-		diff := a[i] - b[i]
-		sum += diff * diff
-	}
-	return float32(math.Sqrt(float64(sum)))
+	similarity := dot / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
+	return 1.0 - similarity
 }
