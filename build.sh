@@ -16,20 +16,21 @@ go build -o bin/obsidx-recall ./cmd/obsidx-recall
 echo "→ Building obsidx-rebuild..."
 go build -o bin/obsidx-rebuild ./cmd/obsidx-rebuild
 
+echo "→ Building obsidx-recall-server..."
+go build -o bin/obsidx-recall-server ./cmd/obsidx-recall-server
+
 echo ""
 echo "✓ Build complete!"
 echo ""
 echo "Binaries created:"
-echo "  bin/obsidx-indexer"
-echo "  bin/obsidx-recall"
-echo "  bin/obsidx-rebuild"
+echo "  bin/obsidx-indexer        # Index your vault (watch mode)"
+echo "  bin/obsidx-recall         # Search (uses daemon for speed)"
+echo "  bin/obsidx-recall-server  # Search daemon (persistent index)"
+echo "  bin/obsidx-rebuild        # Rebuild HNSW index"
 echo ""
 echo "Quick start:"
-echo "  ./watcher.sh ~/notes     # Start with auto-setup"
-echo ""
-echo "Or manually:"
-echo "  ollama serve               # (in another terminal)"
-echo "  ./bin/obsidx-indexer --vault ~/notes --watch"
-echo "  ./bin/obsidx-recall \"your search query\""
+echo "  ./start-daemon.sh ~/notes     # Start both indexer + search server"
+echo "  ./bin/obsidx-recall \"query\"    # Search (fast, <100ms)"
+echo "  ./stop-daemon.sh              # Stop everything"
 
 

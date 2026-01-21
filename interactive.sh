@@ -29,11 +29,22 @@ echo "📚 Starting indexer in background for: $VAULT"
 ./bin/obsidx-indexer --vault "$VAULT" --watch > .obsidian-index/indexer.log 2>&1 &
 INDEXER_PID=$!
 
-# Wait a moment for indexer to start
-sleep 2
+# Wait a moment for indexer to start and create database
+sleep 3
 
 echo "✓ Indexer running (PID: $INDEXER_PID)"
 echo "  Logs: tail -f .obsidian-index/indexer.log"
+
+# Start search server in background
+echo "🔍 Starting search server in background..."
+./bin/obsidx-recall-server --db .obsidian-index/obsidx.db > .obsidian-index/recall-server.log 2>&1 &
+SERVER_PID=$!
+
+# Wait for server to be ready
+sleep 2
+
+echo "✓ Search server running (PID: $SERVER_PID)"
+echo "  Logs: tail -f .obsidian-index/recall-server.log"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -42,10 +53,10 @@ echo ""
 cleanup() {
     echo ""
     echo ""
-    echo "🛑 Stopping indexer..."
-    kill $INDEXER_PID 2>/dev/null || true
-    wait $INDEXER_PID 2>/dev/null || true
-    echo "✓ Indexer stopped"
+    echo "🛑 Stopping processes..."
+    kill $INDEXER_PID $SERVER_PID 2>/dev/null || true
+    wait $INDEXER_PID $SERVER_PID 2>/dev/null || true
+    echo "✓ Stopped"
     exit 0
 }
 

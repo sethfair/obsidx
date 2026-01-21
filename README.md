@@ -98,15 +98,38 @@ This prevents AI agents from latching onto old drafts instead of established dec
 git clone https://github.com/sethfair/obsidx
 cd obsidx
 ./build.sh
-./watcher.sh ~/MyObsidianVault
+./start-daemon.sh ~/MyObsidianVault  # Runs in background
 ```
 
 This automatically:
-- Starts Ollama if not running
+- Starts Ollama if not running  
 - Downloads the embedding model if needed
-- Begins indexing your vault in watch mode
+- Starts the indexer in watch mode (background)
+- Starts the search server with persistent HNSW index (background)
 
-**Interactive mode (search while indexing):**
+**Search (instant, <100ms):**
+
+```bash
+./bin/obsidx-recall "your query"
+```
+
+**Stop everything:**
+
+```bash
+./stop-daemon.sh
+```
+
+**Watch logs:**
+
+```bash
+# Indexer activity
+tail -f .obsidian-index/indexer.log
+
+# Search server activity
+tail -f .obsidian-index/recall-server.log
+```
+
+**Interactive mode (foreground with live logs):**
 
 ```bash
 ./interactive.sh ~/MyObsidianVault
@@ -167,8 +190,10 @@ The indexer:
 
 ### 3. Search
 
+The search server keeps the HNSW index loaded in memory for instant searches.
+
 ```bash
-# Standard search (excludes archive, weights by category)
+# Standard search (fast: <100ms)
 ./bin/obsidx-recall "how do we handle authentication"
 
 # Canon-only (authoritative decisions only)
@@ -183,21 +208,23 @@ The indexer:
 # JSON output (for tooling)
 ./bin/obsidx-recall --json "api design principles" | jq
 
-# Quiet mode (disable logging for scripting)
+# Quiet mode (disable timing info for scripting)
 ./bin/obsidx-recall --verbose=false "query"
 ```
 
-**Search Activity Logging:**
+**Performance:**
+- First time: Server auto-starts if not running (takes ~5 seconds to load index)
+- Subsequent searches: <100ms (index stays in memory)
+- No index rebuild on every search!
 
-By default, obsidx-recall shows detailed progress:
+**Search Activity:**
+
+By default, obsidx-recall shows:
 - Query being searched
-- Connection to Ollama
-- HNSW index loading progress
-- Search stages (HNSW → fetch → rerank)
-- Timing information
-- Result counts
+- Timing breakdown (embed, search, fetch, rerank)
+- Total time
 
-Use `--verbose=false` to disable logging for scripting or when piping output.
+Use `--verbose=false` to disable timing output for scripting.
 
 ## Metadata System
 
@@ -530,7 +557,7 @@ This file is created in your **current working directory** when you run the inde
 ```bash
 # If you run from your home directory:
 cd ~
-./code/obsidx/watcher.sh ~/notes
+./code/obsidx/start-daemon.sh ~/notes
 
 # Database is created at:
 ~/.obsidian-index/obsidx.db
@@ -617,7 +644,7 @@ Configure Copilot to use obsidx as your knowledge source through instruction fil
 
 **Quick Setup:**
 
-1. Index your vault: `./watcher.sh ~/notes`
+1. Start daemons: `./start-daemon.sh ~/notes` (runs in background)
 2. Copy instructions: `cp .github/copilot-instructions.md ~/.github/` (global)  
    or `cp .github/copilot-instructions.md /path/to/project/.github/` (per-project)
 3. Add to PATH: `echo 'export PATH="$HOME/code/obsidx/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc`

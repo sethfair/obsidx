@@ -1,69 +1,146 @@
 # obsidx Documentation
 
-**Quick navigation for all documentation.**
+Complete documentation for obsidx - semantic search for your Obsidian vault with AI-assisted development.
 
-## Getting Started
+## Quick Start
 
-- **[../README.md](../README.md)** - Main project README with quick start and overview
-- **[Installation & First Run](../INSTALL.md)** - How to install and run obsidx
+**New user?** Start here:
+1. Read the main [README.md](../README.md) in the root
+2. Follow the quick start to get running
+3. Come back here for detailed guides
 
-## Core Concepts
+## User Guides
 
-- **[KNOWLEDGE_GOVERNANCE.md](KNOWLEDGE_GOVERNANCE.md)** - How to structure and govern your knowledge base
-  - Category system (canon/project/workbench/archive)
-  - Metadata schema and lifecycle management
-  - ADR pattern for architectural decisions
-  - Promotion workflow from draft to canon
+### Core Functionality
 
-## Database & Storage
+**[RETRIEVAL.md](RETRIEVAL.md)** - Search Your Vault
+- How to search effectively
+- Query syntax and filters
+- Category-based search (canon/project/workbench/archive)
+- Performance tips
 
-**Database Location:** `.obsidian-index/obsidx.db` (SQLite database in current directory)
+**[OBSIDIAN-FRONTMATTER.md](OBSIDIAN-FRONTMATTER.md)** - Organize with Metadata
+- Frontmatter fields explained
+- Category system (canon/project/workbench/archive)
+- Knowledge lifecycle (draft → active → canon → archive)
+- ADR (Architecture Decision Record) template
+- Search examples by category
 
-obsidx uses **SQLite** for local storage - there is no server to run. The database file is created automatically when you run the indexer:
+**[MODES.md](MODES.md)** - Running obsidx
+- Daemon mode (background processes)
+- Foreground mode (with live logs)
+- Interactive mode (search prompt)
+- Process management
 
-```bash
-# Database is created in current directory as:
-.obsidian-index/
-├── obsidx.db           # SQLite database (chunks + metadata)
-└── hnsw/               # HNSW index files (optional, rebuilt from SQLite)
+### AI Integration
+
+**[COPILOT.md](COPILOT.md)** - GitHub Copilot Integration
+- Quick 2-minute setup
+- How Copilot uses your vault
+- Search commands and protocols
+- Canon authority and conflict resolution
+- Code generation workflows
+- Troubleshooting and testing
+
+## Documentation Map
+
+```
+User Journey:
+1. Install & Setup → ../README.md (root)
+2. Choose Mode → MODES.md
+3. Search → RETRIEVAL.md
+4. Organize → OBSIDIAN-FRONTMATTER.md
+5. AI Integration → COPILOT.md
 ```
 
-**Key Points:**
-- **No server process** - SQLite is embedded in the binaries
-- **Portable** - Copy `.obsidian-index/` to move your index
-- **Local storage** - All data stays on your machine
-- **Single writer** - Only run one indexer per vault at a time
-- **Multiple readers** - Can run many search queries concurrently
+## Quick Reference
 
-**Default Location:** Current working directory  
-**Custom Location:** Use `--db /path/to/obsidx.db` flag with any command
+### Common Tasks
 
-## Usage Guides
+**Start obsidx:**
+```bash
+./start-daemon.sh ~/notes
+```
 
-- **[RETRIEVAL.md](RETRIEVAL.md)** - How to search and retrieve knowledge
-  - Search commands and filters
-  - Category-aware retrieval
-  - Understanding weights and ranking
-  - Output format and badges
+**Search:**
+```bash
+./bin/obsidx-recall "your query"
+```
 
-## AI Integration
+**Search canon only:**
+```bash
+./bin/obsidx-recall --canon-only "query"
+```
 
-- **[COPILOT_QUICKSTART.md](COPILOT_QUICKSTART.md)** - 2-minute setup for GitHub Copilot
-- **[COPILOT_GUIDE.md](COPILOT_GUIDE.md)** - Complete AI integration reference
+**Stop obsidx:**
+```bash
+./stop-daemon.sh
+```
+
+**Watch logs:**
+```bash
+tail -f .obsidian-index/indexer.log
+tail -f .obsidian-index/recall-server.log
+```
+
+### File Organization
+
+Add to your notes:
+```yaml
+---
+category: canon        # canon | project | workbench | archive
+scope: mycompany      # your organization/project
+type: decision        # decision | principle | vision | spec | note | log
+status: active        # active | draft | superseded | deprecated
+---
+```
+
+### Search Filters
+
+```bash
+# Canon only (authoritative)
+--canon-only
+
+# Specific categories
+--category "canon,project"
+
+# Include archive
+--exclude-archive=false
+
+# JSON output
+--json
+
+# Quiet mode
+--verbose=false
+```
 
 ## Documentation Status
 
 | Document | Lines | Purpose | Audience |
 |----------|-------|---------|----------|
-| README.md (root) | ~660 | Project overview, quick start | All users |
-| KNOWLEDGE_GOVERNANCE.md | ~500 | Metadata system, lifecycle | Knowledge managers |
-| RETRIEVAL.md | ~580 | Search and filtering | End users |
-| COPILOT_QUICKSTART.md | ~180 | Fast Copilot setup | Developers |
-| COPILOT_GUIDE.md | ~600 | Complete AI integration | Power users |
+| README.md (root) | ~700 | Project overview, setup | All users |
+| MODES.md | ~200 | Running modes | All users |
+| RETRIEVAL.md | ~600 | Search guide | All users |
+| OBSIDIAN-FRONTMATTER.md | ~500 | Frontmatter & organization | All users |
+| COPILOT.md | ~400 | AI integration | Developers |
+
+**Last Updated:** January 20, 2026
+
+## Getting Help
+
+1. **Search issues:** Check logs for errors
+2. **Check logs:** `tail -f .obsidian-index/*.log`
+3. **Read search guide:** See RETRIEVAL.md for advanced usage
+4. **Check frontmatter:** See OBSIDIAN-FRONTMATTER.md for organization tips
+
+## Contributing
+
+When adding documentation:
+- User-facing guides go in docs/
+- Keep docs concise and actionable
+- Update this README when adding new docs
+- Use examples liberally
 
 ---
 
-**Documentation Philosophy:**
-- **Quick start first** - Get running in minutes
-- **Depth when needed** - Reference guides for power users
-- **No redundancy** - Each doc has a single responsibility
+**Philosophy:** obsidx keeps your knowledge organized and makes AI assistants use YOUR decisions, not generic advice.

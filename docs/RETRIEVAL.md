@@ -410,7 +410,7 @@ kb-all "historical decisions"
 
 **Possible causes:**
 
-1. **Index not built:** Run `./watcher.sh ~/notes` first
+1. **Index not built:** Run `./start-daemon.sh ~/notes` first
 2. **Query too specific:** Try broader terms
 3. **Wrong category filter:** Remove filters to search all categories
 4. **Content not indexed:** Check if files are `.md` and in vault
@@ -445,7 +445,7 @@ obsidx-recall --exclude-archive=false "the"
 **Check:**
 
 1. **Metadata correct:** `category: canon` and `status: active`
-2. **Reindex if metadata changed:** `./watcher.sh ~/notes`
+2. **Reindex if metadata changed:** `./start-daemon.sh ~/notes`
 3. **Verify in database:**
    ```bash
    sqlite3 .obsidian-index/obsidx.db \
