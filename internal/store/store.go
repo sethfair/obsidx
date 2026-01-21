@@ -67,9 +67,22 @@ type ChunkWithEmbedding struct {
 
 // Open creates or opens a SQLite database
 func Open(path string, dimension int) (*SQLite, error) {
-	db, err := sql.Open("sqlite3", path+"?_journal_mode=WAL&_synchronous=NORMAL&_cache_size=-64000")
+	// Enhanced connection string for better concurrency handling
+	connStr := path + "?_journal_mode=WAL&_synchronous=NORMAL&_cache_size=-64000&_busy_timeout=5000&_txlock=immediate"
+
+	db, err := sql.Open("sqlite3", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
+	}
+
+	// Set connection pool settings for better concurrency
+	db.SetMaxOpenConns(1) // SQLite works best with single writer
+	db.SetMaxIdleConns(1)
+
+	// Test connection
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("ping db: %w", err)
 	}
 
 	// Initialize schema
@@ -111,6 +124,20 @@ func (s *SQLite) GetFileInfo(ctx context.Context, path string) (*FileInfo, error
 // UpsertFileInfo updates or inserts file tracking info
 func (s *SQLite) UpsertFileInfo(ctx context.Context, fi *FileInfo) error {
 	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO files (path, sha256, mtime_unix, indexed_at_unix)
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT(path) DO UPDATE SET
+		   sha256 = excluded.sha256,
+		   mtime_unix = excluded.mtime_unix,
+		   indexed_at_unix = excluded.indexed_at_unix`,
+		fi.Path, fi.SHA256, fi.MtimeUnix, fi.IndexedAtUnix,
+	)
+	return err
+}
+
+// UpsertFileInfoTx updates or inserts file tracking info within a transaction
+func (s *SQLite) UpsertFileInfoTx(ctx context.Context, tx *sql.Tx, fi *FileInfo) error {
+	_, err := tx.ExecContext(ctx,
 		`INSERT INTO files (path, sha256, mtime_unix, indexed_at_unix)
 		 VALUES (?, ?, ?, ?)
 		 ON CONFLICT(path) DO UPDATE SET

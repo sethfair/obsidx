@@ -7,11 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/seth/obsidx/internal/ann"
 	"github.com/seth/obsidx/internal/chunker"
 	"github.com/seth/obsidx/internal/embed"
+	"github.com/seth/obsidx/internal/metadata"
 	"github.com/seth/obsidx/internal/store"
 )
 
@@ -58,19 +60,72 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 		return fmt.Errorf("read file: %w", err)
 	}
 
-	chunks := chunker.ChunkMarkdown(string(content))
+	contentStr := string(content)
+
+	// Extract metadata from front matter
+	noteMeta := metadata.ParseFrontMatter(contentStr)
+
+	// Infer category from path if not explicit
+	if noteMeta.Category == "" {
+		noteMeta.InferredCategory = metadata.InferCategoryFromPath(path)
+	}
+
+	// Get effective category and weight
+	effectiveCategory := noteMeta.EffectiveCategory()
+	categoryWeight := noteMeta.CombinedWeight()
+
+	chunks := chunker.ChunkMarkdown(contentStr)
 	if len(chunks) == 0 {
 		return nil // Empty file
 	}
 
-	// Embed all chunks
-	vectors := make([][]float32, len(chunks))
+	// Apply metadata to all chunks
+	for i := range chunks {
+		chunks[i].Category = effectiveCategory
+		chunks[i].Status = noteMeta.Status
+		chunks[i].Scope = noteMeta.Scope
+		chunks[i].NoteType = noteMeta.Type
+		chunks[i].CategoryWeight = categoryWeight
+	}
+
+	// Embed chunks, skipping empty ones
+	type chunkWithVector struct {
+		chunk  chunker.Chunk
+		vector []float32
+		index  int
+	}
+
+	validChunks := make([]chunkWithVector, 0, len(chunks))
+
 	for i, chunk := range chunks {
+		// Skip chunks that are too short
+		trimmed := strings.TrimSpace(chunk.Content)
+		if len(trimmed) < 10 {
+			continue
+		}
+
 		vec, err := idx.embedder.Embed(ctx, chunk.Content)
 		if err != nil {
-			return fmt.Errorf("embed chunk %d: %w", i, err)
+			// Log but continue with other chunks
+			fmt.Printf("  Warning: embed chunk %d failed: %v\n", i, err)
+			continue
 		}
-		vectors[i] = vec
+
+		// Skip empty embeddings
+		if len(vec) == 0 {
+			fmt.Printf("  Warning: empty embedding for chunk %d, skipping\n", i)
+			continue
+		}
+
+		validChunks = append(validChunks, chunkWithVector{
+			chunk:  chunk,
+			vector: vec,
+			index:  i,
+		})
+	}
+
+	if len(validChunks) == 0 {
+		return nil // No valid chunks to index
 	}
 
 	// Store in SQLite with transaction
@@ -86,51 +141,51 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 	}
 
 	// Insert new chunks and embeddings
-	for i, chunk := range chunks {
+	for _, cwv := range validChunks {
 		storeChunk := &store.Chunk{
 			Path:           path,
-			HeadingPath:    chunk.HeadingPath,
-			ChunkIndex:     chunk.ChunkIndex,
-			Content:        chunk.Content,
-			ContentSHA256:  chunker.ComputeContentHash(chunk.Content),
-			StartLine:      chunk.StartLine,
-			EndLine:        chunk.EndLine,
-			Category:       chunk.Category,
-			Status:         chunk.Status,
-			Scope:          chunk.Scope,
-			NoteType:       chunk.NoteType,
-			CategoryWeight: chunk.CategoryWeight,
+			HeadingPath:    cwv.chunk.HeadingPath,
+			ChunkIndex:     cwv.chunk.ChunkIndex,
+			Content:        cwv.chunk.Content,
+			ContentSHA256:  chunker.ComputeContentHash(cwv.chunk.Content),
+			StartLine:      cwv.chunk.StartLine,
+			EndLine:        cwv.chunk.EndLine,
+			Category:       cwv.chunk.Category,
+			Status:         cwv.chunk.Status,
+			Scope:          cwv.chunk.Scope,
+			NoteType:       cwv.chunk.NoteType,
+			CategoryWeight: cwv.chunk.CategoryWeight,
 		}
 
 		chunkID, err := idx.store.InsertChunk(ctx, tx, storeChunk)
 		if err != nil {
-			return fmt.Errorf("insert chunk %d: %w", i, err)
+			return fmt.Errorf("insert chunk %d: %w", cwv.index, err)
 		}
 
 		embedding := &store.Embedding{
 			ChunkID: chunkID,
-			Dim:     len(vectors[i]),
-			Vec:     vectors[i],
+			Dim:     len(cwv.vector),
+			Vec:     cwv.vector,
 		}
 
 		if err := idx.store.InsertEmbedding(ctx, tx, embedding); err != nil {
-			return fmt.Errorf("insert embedding %d: %w", i, err)
+			return fmt.Errorf("insert embedding %d: %w", cwv.index, err)
 		}
 
 		// Add to ANN index
-		if err := idx.annIndex.Add(uint64(chunkID), vectors[i]); err != nil {
+		if err := idx.annIndex.Add(uint64(chunkID), cwv.vector); err != nil {
 			return fmt.Errorf("add to ann index: %w", err)
 		}
 	}
 
-	// Update file info
+	// Update file info (within the same transaction)
 	fileInfo := &store.FileInfo{
 		Path:          path,
 		SHA256:        fileHash,
 		MtimeUnix:     mtime,
 		IndexedAtUnix: time.Now().Unix(),
 	}
-	if err := idx.store.UpsertFileInfo(ctx, fileInfo); err != nil {
+	if err := idx.store.UpsertFileInfoTx(ctx, tx, fileInfo); err != nil {
 		return fmt.Errorf("upsert file info: %w", err)
 	}
 

@@ -67,10 +67,28 @@ This prevents AI agents from latching onto old drafts instead of established dec
 
 ## Quick Start
 
+**One command to run everything:**
+
+```bash
+git clone https://github.com/sethfair/obsidx
+cd obsidx
+./build.sh
+./run.sh ~/MyObsidianVault
+```
+
+This automatically:
+- Starts Ollama if not running
+- Downloads the embedding model if needed
+- Begins indexing your vault in watch mode
+
+### Manual Setup
+
+If you prefer more control:
+
 ### 1. Install
 
 ```bash
-git clone https://github.com/seth/obsidx
+git clone https://github.com/sethfair/obsidx
 cd obsidx
 go build -o bin/ ./cmd/...
 ```
@@ -395,9 +413,45 @@ CREATE TABLE embeddings (
 );
 ```
 
+## GitHub Copilot Integration
+
+Configure Copilot to use obsidx as your knowledge source:
+
+**Quick Setup:**
+1. Copy `.github/copilot-instructions.md` to your project root
+2. Copilot will now search your knowledge base before answering
+
+**Key Command:**
+```bash
+~/code/obsidx/bin/obsidx-recall --json "your query" | head -c 2000
+```
+
+**Full Setup Guide:** See [docs/COPILOT_SETUP.md](docs/COPILOT_SETUP.md)
+
+### Example Workflow
+
+**You:** "Implement authentication"
+
+**Copilot:**
+```bash
+# Searches canon first
+obsidx-recall --canon-only "authentication"
+
+# Finds: ADR-005-OAuth-Strategy.md
+# Implements based on established decision
+```
+
+### Benefits
+
+- ✅ Copilot uses YOUR decisions, not generic advice
+- ✅ Respects canon as authoritative
+- ✅ Flags conflicts with established patterns
+- ✅ Suggests ADRs for new decisions
+- ✅ Cites specific notes in responses
+
 ## Agent Instructions
 
-Embed this in your AI agent's system prompt:
+For other AI agents, use this system prompt:
 
 ```
 Before generating any code or architectural decisions:

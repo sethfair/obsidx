@@ -25,5 +25,11 @@ echo "  bin/obsidx-recall"
 echo "  bin/obsidx-rebuild"
 echo ""
 echo "Quick start:"
+echo "  ./run.sh ~/notes     # Start with auto-setup"
+echo ""
+echo "Or manually:"
+echo "  ollama serve               # (in another terminal)"
 echo "  ./bin/obsidx-indexer --vault ~/notes --watch"
 echo "  ./bin/obsidx-recall \"your search query\""
+
+
