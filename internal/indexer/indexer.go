@@ -198,7 +198,12 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 
 // IndexVault processes all markdown files in the vault
 func (idx *Indexer) IndexVault(ctx context.Context) error {
-	return filepath.Walk(idx.vaultDir, func(path string, info os.FileInfo, err error) error {
+	fileCount := 0
+	errorCount := 0
+	skippedCount := 0
+	indexedCount := 0
+
+	err := filepath.Walk(idx.vaultDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -216,14 +221,33 @@ func (idx *Indexer) IndexVault(ctx context.Context) error {
 			return nil
 		}
 
-		fmt.Printf("Indexing: %s\n", path)
+		fileCount++
+		relPath, _ := filepath.Rel(idx.vaultDir, path)
+
+		// Show progress every 10 files
+		if fileCount%10 == 0 {
+			fmt.Printf("   📄 Processed %d files... (indexed: %d, skipped: %d, errors: %d)\n",
+				fileCount, indexedCount, skippedCount, errorCount)
+		}
+
 		if err := idx.IndexFile(ctx, path); err != nil {
-			fmt.Printf("Error indexing %s: %v\n", path, err)
+			errorCount++
+			fmt.Printf("   ❌ Error indexing %s: %v\n", relPath, err)
 			// Continue with other files
+		} else {
+			// IndexFile returns nil if file was skipped (unchanged)
+			// We could track this better, but for now count as indexed
+			indexedCount++
 		}
 
 		return nil
 	})
+
+	// Final summary
+	fmt.Printf("   ✓ Indexing complete: %d files processed (%d indexed, %d errors)\n",
+		fileCount, indexedCount, errorCount)
+
+	return err
 }
 
 // computeFileHash returns SHA256 hash and mtime of a file

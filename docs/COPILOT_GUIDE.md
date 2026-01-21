@@ -492,7 +492,7 @@ export PATH="$HOME/code/obsidx/bin:$PATH"
 **Solution:**
 1. Verify indexer ran: `ls .obsidian-index/obsidx.db`
 2. Check if vault is indexed: `obsidx-recall "test"`
-3. Reindex if needed: `./run.sh ~/notes`
+3. Reindex if needed: `./watcher.sh ~/notes`
 
 ## Advanced Configuration
 

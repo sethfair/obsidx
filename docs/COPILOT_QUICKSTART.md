@@ -10,7 +10,7 @@ Configures GitHub Copilot to search your Obsidian vault (via obsidx) **before** 
 
 ```bash
 cd ~/code/obsidx
-./run.sh ~/notes  # Wait for initial indexing to complete
+./watcher.sh ~/notes  # Wait for initial indexing to complete
 ```
 
 ### Step 2: Add Copilot Instructions
@@ -110,7 +110,7 @@ With:
 
 ```bash
 cd ~/code/obsidx
-./run.sh ~/notes
+./watcher.sh ~/notes
 # Wait for "✓ Initial index complete"
 ```
 
@@ -136,7 +136,7 @@ architecture, or decisions, you MUST search the knowledge base first.**
 ```bash
 # Terminal 1: Keep indexer running
 cd ~/code/obsidx
-./run.sh ~/notes
+./watcher.sh ~/notes
 
 # Terminal 2: Work normally
 # Changes are automatically indexed

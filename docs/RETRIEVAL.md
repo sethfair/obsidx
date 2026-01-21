@@ -19,6 +19,39 @@ obsidx-recall --category "canon,project" "authentication"
 
 # JSON output (for scripting)
 obsidx-recall --json "query" | jq
+
+# Quiet mode (no logging, for scripting)
+obsidx-recall --verbose=false --json "query" | jq
+```
+
+### Search Activity Logging
+
+By default, obsidx-recall shows detailed logging of search operations:
+
+```bash
+$ obsidx-recall "authentication"
+2026/01/20 19:00:00 🔍 Searching for: "authentication"
+2026/01/20 19:00:00 📊 Database: dim=768, model=nomic-embed-text
+2026/01/20 19:00:00 🔌 Connecting to Ollama at http://localhost:11434...
+2026/01/20 19:00:00 ✓ Connected to Ollama
+2026/01/20 19:00:00 🏗️  Building HNSW index...
+2026/01/20 19:00:01 ✓ Loaded 5432 vectors into HNSW index
+2026/01/20 19:00:01 🧮 Generating embedding for query...
+2026/01/20 19:00:01 🔎 Stage 1: Searching HNSW for 200 candidates...
+2026/01/20 19:00:01 ✓ Found 200 candidates in 2ms
+2026/01/20 19:00:01 📥 Stage 2: Fetching chunks from database...
+2026/01/20 19:00:01 ✓ Fetched 200 chunks
+2026/01/20 19:00:01 🎯 Stage 3: Reranking with exact cosine + category weights...
+2026/01/20 19:00:01 ✓ Reranked to top 12 results in 1ms
+2026/01/20 19:00:01 ✅ Search complete in 1.5s
+
+Found 12 results:
+...
+```
+
+**Disable logging for scripting:**
+```bash
+obsidx-recall --verbose=false "query"
 ```
 
 ---
@@ -377,7 +410,7 @@ kb-all "historical decisions"
 
 **Possible causes:**
 
-1. **Index not built:** Run `./run.sh ~/notes` first
+1. **Index not built:** Run `./watcher.sh ~/notes` first
 2. **Query too specific:** Try broader terms
 3. **Wrong category filter:** Remove filters to search all categories
 4. **Content not indexed:** Check if files are `.md` and in vault
@@ -412,7 +445,7 @@ obsidx-recall --exclude-archive=false "the"
 **Check:**
 
 1. **Metadata correct:** `category: canon` and `status: active`
-2. **Reindex if metadata changed:** `./run.sh ~/notes`
+2. **Reindex if metadata changed:** `./watcher.sh ~/notes`
 3. **Verify in database:**
    ```bash
    sqlite3 .obsidian-index/obsidx.db \

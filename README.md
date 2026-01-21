@@ -98,13 +98,26 @@ This prevents AI agents from latching onto old drafts instead of established dec
 git clone https://github.com/sethfair/obsidx
 cd obsidx
 ./build.sh
-./run.sh ~/MyObsidianVault
+./watcher.sh ~/MyObsidianVault
 ```
 
 This automatically:
 - Starts Ollama if not running
 - Downloads the embedding model if needed
 - Begins indexing your vault in watch mode
+
+**Interactive mode (search while indexing):**
+
+```bash
+./interactive.sh ~/MyObsidianVault
+```
+
+This runs the indexer in the background and gives you an interactive search prompt:
+- Type queries to search your vault
+- Type `logs` to see recent indexer activity
+- Type `quit` to exit
+- Shows both indexer and search logging
+
 
 ### Manual Setup
 
@@ -169,7 +182,22 @@ The indexer:
 
 # JSON output (for tooling)
 ./bin/obsidx-recall --json "api design principles" | jq
+
+# Quiet mode (disable logging for scripting)
+./bin/obsidx-recall --verbose=false "query"
 ```
+
+**Search Activity Logging:**
+
+By default, obsidx-recall shows detailed progress:
+- Query being searched
+- Connection to Ollama
+- HNSW index loading progress
+- Search stages (HNSW → fetch → rerank)
+- Timing information
+- Result counts
+
+Use `--verbose=false` to disable logging for scripting or when piping output.
 
 ## Metadata System
 
@@ -502,7 +530,7 @@ This file is created in your **current working directory** when you run the inde
 ```bash
 # If you run from your home directory:
 cd ~
-./code/obsidx/run.sh ~/notes
+./code/obsidx/watcher.sh ~/notes
 
 # Database is created at:
 ~/.obsidian-index/obsidx.db
@@ -589,7 +617,7 @@ Configure Copilot to use obsidx as your knowledge source through instruction fil
 
 **Quick Setup:**
 
-1. Index your vault: `./run.sh ~/notes`
+1. Index your vault: `./watcher.sh ~/notes`
 2. Copy instructions: `cp .github/copilot-instructions.md ~/.github/` (global)  
    or `cp .github/copilot-instructions.md /path/to/project/.github/` (per-project)
 3. Add to PATH: `echo 'export PATH="$HOME/code/obsidx/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc`

@@ -18,7 +18,7 @@ if ! command -v ollama &> /dev/null; then
     echo "    curl -fsSL https://ollama.com/install.sh | sh"
     echo ""
     echo "After installing, run this script again:"
-    echo "  ./run.sh $1"
+    echo "  ./watcher.sh $1"
     echo ""
     echo "See INSTALL.md for detailed instructions"
     exit 1

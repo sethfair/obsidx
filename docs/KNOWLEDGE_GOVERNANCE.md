@@ -543,7 +543,7 @@ If you already have ADRs:
 2. Add front matter with `category: canon` and `type: decision`
 3. Set `status: active` or `status: superseded` appropriately
 4. Add `last_reviewed` dates
-5. Reindex: `./run.sh ~/notes`
+5. Reindex: `./watcher.sh ~/notes`
 
 ---
 
@@ -559,7 +559,7 @@ Check:
    ```bash
    sqlite3 .obsidian-index/obsidx.db "SELECT path, category, category_weight FROM chunks LIMIT 5;"
    ```
-5. Reindex if needed: `./run.sh ~/notes`
+5. Reindex if needed: `./watcher.sh ~/notes`
 
 ### Categories Not Detected
 
