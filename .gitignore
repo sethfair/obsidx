@@ -27,6 +27,20 @@ go.work.sum
 # env file
 .env
 
+# obsidx specific
+*.db
+*.db-shm
+*.db-wal
+.obsidian-index/
+obsidx-indexer
+obsidx-recall
+obsidx-rebuild
+
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
