@@ -3,77 +3,44 @@ package metadata
 import (
 	"strings"
 	"time"
+
+	"github.com/sethfair/obsidx/internal/config"
 )
 
 // NoteMetadata represents extracted front matter
 type NoteMetadata struct {
-	Category     string // canon, project, workbench, archive
 	Scope        string // mycompany, myproject, personal, etc.
 	Type         string // decision, principle, vision, spec, note, log, glossary
 	Status       string // active, draft, superseded, deprecated
 	LastReviewed time.Time
 	Tags         []string
-
-	// Derived fields
-	InferredCategory string // from folder structure if no explicit category
 }
 
-// CategoryWeight returns the retrieval weight for a category
-func (m *NoteMetadata) CategoryWeight() float32 {
-	switch m.EffectiveCategory() {
-	case "canon":
-		return 1.20
-	case "project":
-		return 1.05
-	case "workbench":
-		return 0.90
-	case "archive":
-		return 0.60
-	default:
-		return 1.0
+// CalculateWeight returns the retrieval weight using the provided config
+func (m *NoteMetadata) CalculateWeight(weightConfig *config.WeightConfig) float32 {
+	// If no config provided, use default weights
+	if weightConfig == nil {
+		weightConfig = config.DefaultWeightConfig()
 	}
-}
 
-// StatusWeight returns the retrieval weight for a status
-func (m *NoteMetadata) StatusWeight() float32 {
-	switch m.Status {
-	case "active":
-		return 1.0
-	case "draft":
-		return 0.90
-	case "superseded", "deprecated":
-		return 0.50
-	default:
-		return 1.0
-	}
-}
-
-// CombinedWeight returns the combined retrieval weight
-func (m *NoteMetadata) CombinedWeight() float32 {
-	return m.CategoryWeight() * m.StatusWeight()
-}
-
-// EffectiveCategory returns the category to use (explicit or inferred)
-func (m *NoteMetadata) EffectiveCategory() string {
-	if m.Category != "" {
-		return m.Category
-	}
-	if m.InferredCategory != "" {
-		return m.InferredCategory
-	}
-	return "project" // default
+	return weightConfig.CalculateWeight(m.Tags, m.Status)
 }
 
 // IsActive returns whether this note should be included in standard retrieval
 func (m *NoteMetadata) IsActive() bool {
-	// Exclude archived notes by default
-	if m.EffectiveCategory() == "archive" {
-		return false
-	}
 	// Exclude superseded/deprecated
 	if m.Status == "superseded" || m.Status == "deprecated" {
 		return false
 	}
+
+	// Check if archive tag is present
+	for _, tag := range m.Tags {
+		normalized := strings.ToLower(strings.TrimPrefix(tag, "#"))
+		if normalized == "archive" || normalized == "archived" {
+			return false
+		}
+	}
+
 	return true
 }
 
@@ -124,8 +91,6 @@ func ParseFrontMatter(markdown string) *NoteMetadata {
 		value = strings.Trim(value, `"'`)
 
 		switch key {
-		case "category", "tier":
-			meta.Category = normalizeCategory(value)
 		case "scope":
 			meta.Scope = value
 		case "type":
@@ -137,12 +102,20 @@ func ParseFrontMatter(markdown string) *NoteMetadata {
 				meta.LastReviewed = t
 			}
 		case "tags":
-			// Simple tag parsing (comma or space separated)
+			// Support multiple tag formats:
+			// 1. Inline with hashtags: tags: #permanent-note #customer-research
+			// 2. Array format: tags: [permanent-note, customer-research]
+			// 3. Array with hashtags: tags: [#permanent-note, #customer-research]
+
 			value = strings.Trim(value, "[]")
+
+			// Split on common separators (space, comma)
 			for _, tag := range strings.FieldsFunc(value, func(r rune) bool {
-				return r == ',' || r == ' '
+				return r == ',' || r == ' ' || r == '\t'
 			}) {
 				tag = strings.TrimSpace(tag)
+				// Remove # prefix if present (normalize to no prefix)
+				tag = strings.TrimPrefix(tag, "#")
 				if tag != "" {
 					meta.Tags = append(meta.Tags, tag)
 				}
@@ -151,43 +124,6 @@ func ParseFrontMatter(markdown string) *NoteMetadata {
 	}
 
 	return meta
-}
-
-// InferCategoryFromPath attempts to infer category from folder structure
-func InferCategoryFromPath(path string) string {
-	lower := strings.ToLower(path)
-
-	// Check for explicit folders
-	if strings.Contains(lower, "/canon/") || strings.Contains(lower, "/@canon/") {
-		return "canon"
-	}
-	if strings.Contains(lower, "/archive/") {
-		return "archive"
-	}
-	if strings.Contains(lower, "/workbench/") || strings.Contains(lower, "/drafts/") {
-		return "workbench"
-	}
-	if strings.Contains(lower, "/projects/") {
-		return "project"
-	}
-
-	return "" // no inference
-}
-
-func normalizeCategory(cat string) string {
-	cat = strings.ToLower(strings.TrimSpace(cat))
-	switch cat {
-	case "canon", "canonical":
-		return "canon"
-	case "project", "projects":
-		return "project"
-	case "workbench", "draft", "drafts", "wip":
-		return "workbench"
-	case "archive", "archived":
-		return "archive"
-	default:
-		return cat
-	}
 }
 
 func normalizeStatus(status string) string {

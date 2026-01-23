@@ -45,16 +45,16 @@ type SearchResponse struct {
 }
 
 type ResultItem struct {
-	Score          float32 `json:"score"`
-	Path           string  `json:"path"`
-	HeadingPath    string  `json:"heading_path"`
-	Category       string  `json:"category"`
-	Status         string  `json:"status"`
-	Scope          string  `json:"scope"`
-	StartLine      int     `json:"start_line"`
-	EndLine        int     `json:"end_line"`
-	Content        string  `json:"content"`
-	CategoryWeight float32 `json:"category_weight"`
+	Score          float32  `json:"score"`
+	Path           string   `json:"path"`
+	HeadingPath    string   `json:"heading_path"`
+	Status         string   `json:"status"`
+	Scope          string   `json:"scope"`
+	StartLine      int      `json:"start_line"`
+	EndLine        int      `json:"end_line"`
+	Content        string   `json:"content"`
+	CategoryWeight float32  `json:"category_weight"`
+	Tags           []string `json:"tags"`
 }
 
 type TimingInfo struct {
@@ -236,13 +236,13 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			Score:          r.Score,
 			Path:           r.Chunk.Path,
 			HeadingPath:    r.Chunk.HeadingPath,
-			Category:       r.Chunk.Category,
 			Status:         r.Chunk.Status,
 			Scope:          r.Chunk.Scope,
 			StartLine:      r.Chunk.StartLine,
 			EndLine:        r.Chunk.EndLine,
 			Content:        r.Chunk.Content,
 			CategoryWeight: r.Chunk.CategoryWeight,
+			Tags:           r.Chunk.Tags,
 		}
 	}
 

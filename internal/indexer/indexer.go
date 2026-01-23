@@ -12,6 +12,7 @@ import (
 
 	"github.com/sethfair/obsidx/internal/ann"
 	"github.com/sethfair/obsidx/internal/chunker"
+	"github.com/sethfair/obsidx/internal/config"
 	"github.com/sethfair/obsidx/internal/embed"
 	"github.com/sethfair/obsidx/internal/metadata"
 	"github.com/sethfair/obsidx/internal/store"
@@ -19,23 +20,30 @@ import (
 
 // Indexer manages the indexing process
 type Indexer struct {
-	store    *store.SQLite
-	embedder embed.Embedder
-	annIndex ann.Index
-	vaultDir string
+	store        *store.SQLite
+	embedder     embed.Embedder
+	annIndex     ann.Index
+	vaultDir     string
+	weightConfig *config.WeightConfig
 }
 
 // New creates a new indexer
 func New(st *store.SQLite, embedder embed.Embedder, annIndex ann.Index, vaultDir string) *Indexer {
 	return &Indexer{
-		store:    st,
-		embedder: embedder,
-		annIndex: annIndex,
-		vaultDir: vaultDir,
+		store:        st,
+		embedder:     embedder,
+		annIndex:     annIndex,
+		vaultDir:     vaultDir,
+		weightConfig: nil, // Will use legacy weights if not set
 	}
 }
 
-// IndexFile processes a single file
+// SetWeightConfig sets the weight configuration for tag-based scoring
+func (idx *Indexer) SetWeightConfig(cfg *config.WeightConfig) {
+	idx.weightConfig = cfg
+}
+
+// IndexFile processes a single file// IndexFile processes a single file
 func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 	// Compute file hash
 	fileHash, mtime, err := computeFileHash(path)
@@ -65,14 +73,8 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 	// Extract metadata from front matter
 	noteMeta := metadata.ParseFrontMatter(contentStr)
 
-	// Infer category from path if not explicit
-	if noteMeta.Category == "" {
-		noteMeta.InferredCategory = metadata.InferCategoryFromPath(path)
-	}
-
-	// Get effective category and weight
-	effectiveCategory := noteMeta.EffectiveCategory()
-	categoryWeight := noteMeta.CombinedWeight()
+	// Calculate weight from tags and status
+	categoryWeight := noteMeta.CalculateWeight(idx.weightConfig)
 
 	chunks := chunker.ChunkMarkdown(contentStr)
 	if len(chunks) == 0 {
@@ -81,11 +83,11 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 
 	// Apply metadata to all chunks
 	for i := range chunks {
-		chunks[i].Category = effectiveCategory
 		chunks[i].Status = noteMeta.Status
 		chunks[i].Scope = noteMeta.Scope
 		chunks[i].NoteType = noteMeta.Type
 		chunks[i].CategoryWeight = categoryWeight
+		chunks[i].Tags = noteMeta.Tags // Store tags for display/filtering
 	}
 
 	// Embed chunks, skipping empty ones
@@ -150,11 +152,11 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 			ContentSHA256:  chunker.ComputeContentHash(cwv.chunk.Content),
 			StartLine:      cwv.chunk.StartLine,
 			EndLine:        cwv.chunk.EndLine,
-			Category:       cwv.chunk.Category,
 			Status:         cwv.chunk.Status,
 			Scope:          cwv.chunk.Scope,
 			NoteType:       cwv.chunk.NoteType,
 			CategoryWeight: cwv.chunk.CategoryWeight,
+			Tags:           cwv.chunk.Tags,
 		}
 
 		chunkID, err := idx.store.InsertChunk(ctx, tx, storeChunk)

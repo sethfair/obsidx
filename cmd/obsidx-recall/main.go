@@ -34,16 +34,16 @@ type SearchResponse struct {
 }
 
 type ResultItem struct {
-	Score          float32 `json:"score"`
-	Path           string  `json:"path"`
-	HeadingPath    string  `json:"heading_path"`
-	Category       string  `json:"category"`
-	Status         string  `json:"status"`
-	Scope          string  `json:"scope"`
-	StartLine      int     `json:"start_line"`
-	EndLine        int     `json:"end_line"`
-	Content        string  `json:"content"`
-	CategoryWeight float32 `json:"category_weight"`
+	Score          float32  `json:"score"`
+	Path           string   `json:"path"`
+	HeadingPath    string   `json:"heading_path"`
+	Status         string   `json:"status"`
+	Scope          string   `json:"scope"`
+	StartLine      int      `json:"start_line"`
+	EndLine        int      `json:"end_line"`
+	Content        string   `json:"content"`
+	CategoryWeight float32  `json:"category_weight"`
+	Tags           []string `json:"tags"`
 }
 
 type TimingInfo struct {
@@ -172,10 +172,9 @@ func printResults(query string, results []ResultItem, timing TimingInfo) {
 		fmt.Printf("─────────────────────────────────────────────────────────────\n")
 		fmt.Printf("[%d] Score: %.4f", i+1, r.Score)
 
-		// Add category badge
-		badge := getCategoryBadge(r.Category)
-		if badge != "" {
-			fmt.Printf(" %s", badge)
+		// Show tags
+		if len(r.Tags) > 0 {
+			fmt.Printf(" [%s]", strings.Join(r.Tags, ", "))
 		}
 		fmt.Printf("\n")
 
@@ -198,21 +197,6 @@ func printResults(query string, results []ResultItem, timing TimingInfo) {
 func printJSON(results []ResultItem) {
 	output, _ := json.MarshalIndent(results, "", "  ")
 	fmt.Println(string(output))
-}
-
-func getCategoryBadge(category string) string {
-	switch category {
-	case "canon":
-		return "[📚 CANON]"
-	case "project":
-		return "[🔨 PROJECT]"
-	case "workbench":
-		return "[🧪 WORKBENCH]"
-	case "archive":
-		return "[📦 ARCHIVE]"
-	default:
-		return ""
-	}
 }
 
 func excerpt(text string, maxLen int) string {

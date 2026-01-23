@@ -22,37 +22,41 @@ Always search before:
 ### Search Examples
 
 ```bash
-# Check for existing decisions
-~/code/obsidx/bin/obsidx-recall --canon-only "authentication"
+# Search all content
+~/code/obsidx/bin/obsidx-recall "authentication strategy"
 
 # Find implementation patterns
 ~/code/obsidx/bin/obsidx-recall "API design patterns"
 
 # Search project docs
-~/code/obsidx/bin/obsidx-recall --category "project" "current features"
+~/code/obsidx/bin/obsidx-recall "current features"
 ```
 
 ## Response Protocol
 
 **Step 1:** Search the knowledge base first
-**Step 2:** Read top 3-5 results and note categories
+**Step 2:** Read top 3-5 results and note their tags
 **Step 3:** Base answer on retrieved context
 **Step 4:** Cite specific notes in your response
 
-### Category Meanings
+### Tag Interpretation
 
-- 📚 **CANON** - Authoritative, treat as law
-- 🔨 **PROJECT** - Current implementation
-- 🧪 **WORKBENCH** - Exploratory, not finalized
-- 📦 **ARCHIVE** - Historical, likely superseded
+Results show tags that indicate note importance and type:
+- **#permanent-note** - Refined insights, highly authoritative
+- **#literature-note** - Curated sources and references
+- **#customer-research** - Validated customer insights
+- **#vision** - Strategic direction and goals
+- **#archive** - Historical, likely superseded
 
-## Canon Authority
+**Higher-weighted tags appear more prominently in search results.**
 
-When canon notes exist:
-- ❌ Don't contradict them silently
-- ✅ Flag conflicts and suggest ADRs
-- ❌ Don't propose alternatives without discussion
-- ✅ Implement according to canon guidance
+## Tag-Based Authority
+
+When reviewing search results:
+- ✅ Trust highly-weighted tags (#permanent-note, #customer-research, #vision)
+- ✅ Prefer notes with relevant project tags (#writerflow, #mvp-1, etc.)
+- ⚠️ Be cautious with #fleeting-notes or #draft - may be unrefined
+- ❌ #archive or deprecated status - historical reference only
 
 ## Example Response
 
@@ -60,32 +64,34 @@ User asks: "How should we implement caching?"
 
 Your process:
 ```bash
-# Search canon first
-~/code/obsidx/bin/obsidx-recall --canon-only "caching strategy"
+~/code/obsidx/bin/obsidx-recall "caching strategy"
 ```
 
-If found:
+If found with #permanent-note:
 ```
 Based on the knowledge base:
 
-📚 CANON: /canon/architecture/caching-guidelines.md
+Note: /architecture/caching-guidelines.md
+Tags: #permanent-note, #architecture-decision
 
 Our established caching strategy is [summary from note].
 
-Implementing according to canon guidelines:
+Implementing according to documented guidelines:
 [code following the guidelines]
 ```
 
-If NOT found:
+If only #fleeting-notes found:
 ```
-I searched the knowledge base and found no established caching strategy.
+I found a draft note on caching, but no finalized decision.
 
-Before implementing, I recommend:
-1. Creating ADR-XXX to document the caching decision
+The draft suggests [summary], but this should be validated.
+
+Recommend:
+1. Creating a permanent note with the decided approach
 2. Defining cache invalidation strategy
-3. Selecting cache technology
+3. Documenting the decision
 
-Would you like me to help draft an ADR?
+Would you like me to help formalize this?
 ```
 
 ## Knowledge Gap Detection
@@ -97,22 +103,38 @@ If no results found for critical topics, suggest creating documentation:
 
 No documentation found for "<topic>".
 
-Recommend creating:
-- ADR if it's a decision
-- Technical doc if it's implementation
-- Architecture doc if it's system design
+Recommend creating a note with appropriate tags:
+- Use #permanent-note for finalized decisions
+- Use #draft or #fleeting-notes for work in progress
+- Add relevant project tags (#writerflow, etc.)
 
 Would you like me to create a template?
 ```
+
+## Tag Weight Customization
+
+The system uses configurable tag weights (see docs/TAG-WEIGHTING.md).
+
+Current defaults:
+- #permanent-note: 1.3
+- #customer-research: 1.25  
+- #vision: 1.3
+- #literature-note: 1.1
+- #fleeting-notes: 0.8
+- #archive: 0.6
+
+Users can customize weights via `.obsidian-index/weights.json`.
 
 ## Quality Checklist
 
 Before responding:
 - [ ] Searched knowledge base
-- [ ] Checked canon for conflicts
+- [ ] Checked tags on top results
+- [ ] Prioritized high-weight tags
 - [ ] Cited specific notes
-- [ ] Distinguished our patterns from generic advice
+- [ ] Distinguished refined notes from drafts
 
 ---
 
-**Remember: Search first, answer second. The knowledge base is the source of truth.**
+**Remember: Search first, answer second. Tag weights indicate source authority.**
+

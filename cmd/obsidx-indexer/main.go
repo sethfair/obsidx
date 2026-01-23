@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/sethfair/obsidx/internal/ann"
+	"github.com/sethfair/obsidx/internal/config"
 	"github.com/sethfair/obsidx/internal/embed"
 	"github.com/sethfair/obsidx/internal/indexer"
 	"github.com/sethfair/obsidx/internal/store"
@@ -19,13 +20,14 @@ import (
 )
 
 var (
-	vaultDir   = flag.String("vault", "", "Path to Obsidian vault (required)")
-	dbPath     = flag.String("db", ".obsidian-index/obsidx.db", "Path to SQLite database")
-	indexDir   = flag.String("index", ".obsidian-index/hnsw", "Path to HNSW index directory")
-	ollamaURL  = flag.String("ollama-url", "http://localhost:11434", "Ollama API endpoint")
-	embedModel = flag.String("model", "nomic-embed-text", "Ollama embedding model (nomic-embed-text, all-minilm, etc)")
-	watchMode  = flag.Bool("watch", false, "Watch mode: continuously monitor for changes")
-	debounceMs = flag.Int("debounce", 500, "Debounce time in milliseconds for watch mode")
+	vaultDir     = flag.String("vault", "", "Path to Obsidian vault (required)")
+	dbPath       = flag.String("db", ".obsidian-index/obsidx.db", "Path to SQLite database")
+	indexDir     = flag.String("index", ".obsidian-index/hnsw", "Path to HNSW index directory")
+	weightConfig = flag.String("weights", ".obsidian-index/weights.json", "Path to weight configuration file")
+	ollamaURL    = flag.String("ollama-url", "http://localhost:11434", "Ollama API endpoint")
+	embedModel   = flag.String("model", "nomic-embed-text", "Ollama embedding model (nomic-embed-text, all-minilm, etc)")
+	watchMode    = flag.Bool("watch", false, "Watch mode: continuously monitor for changes")
+	debounceMs   = flag.Int("debounce", 500, "Debounce time in milliseconds for watch mode")
 )
 
 func main() {
@@ -95,8 +97,24 @@ func main() {
 		log.Fatalf("Check/rebuild index: %v", err)
 	}
 
+	// Load weight configuration
+	weightCfg, err := config.LoadWeightConfig(*weightConfig)
+	if err != nil {
+		log.Printf("Warning: Could not load weight config: %v", err)
+		log.Println("Using default weights")
+		weightCfg = config.DefaultWeightConfig()
+	} else {
+		if _, err := os.Stat(*weightConfig); os.IsNotExist(err) {
+			log.Println("No weight config found, using defaults")
+			log.Printf("Run 'obsidx-weights --init' to create %s", *weightConfig)
+		} else {
+			log.Printf("Loaded weight config from: %s", *weightConfig)
+		}
+	}
+
 	// Create indexer
 	idx := indexer.New(st, embedder, annIndex, *vaultDir)
+	idx.SetWeightConfig(weightCfg)
 
 	if *watchMode {
 		// Watch mode: monitor for changes

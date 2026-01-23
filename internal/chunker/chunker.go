@@ -15,11 +15,11 @@ type Chunk struct {
 	StartLine   int
 	EndLine     int
 	// Metadata inherited from note
-	Category       string
 	Status         string
 	Scope          string
 	NoteType       string
-	CategoryWeight float32
+	CategoryWeight float32  // Calculated from tags using weight config
+	Tags           []string // Tags from frontmatter (e.g., #permanent-note, #writerflow)
 }
 
 // ChunkMarkdown splits markdown into semantic chunks

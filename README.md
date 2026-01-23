@@ -371,42 +371,93 @@ Lines: 8-25
 The rate limiter is implemented in middleware/ratelimit.go...
 ```
 
-## Knowledge Governance
+## Tag-Based Weighting & Knowledge Governance
 
-### Promotion Workflow
+### Customizable Priority System
+
+ObsIDX uses **tag weights** to prioritize content. Configure for your knowledge system:
+
+```bash
+# Initialize with defaults (Zettelkasten, PARA, Writerflow)
+./bin/obsidx-weights --init
+
+# View current weights
+./bin/obsidx-weights
+
+# Edit: .obsidian-index/weights.json
+```
+
+### Knowledge Maturity Workflow
 
 ```
-workbench → project → canon → archive
+fleeting → literature → permanent → archive
 ```
 
-1. **Draft in workbench** (`category: workbench`)
-   - Speculative, incomplete, messy
+1. **Capture** (`tags: [fleeting-notes]`, weight: 0.8)
+   - Quick captures, unrefined ideas
 
-2. **Refine in project** (`category: project`)
-   - Structured, evolving, under active development
+2. **Curate** (`tags: [literature-note]`, weight: 1.1)
+   - Paraphrased sources, structured notes
 
-3. **Promote to canon** (`category: canon, status: active`)
-   - Stable, authoritative, enforced
-   - Requires `last_reviewed` date
-   - Becomes law for AI agents
+3. **Synthesize** (`tags: [permanent-note]`, weight: 1.3)
+   - Refined insights, authoritative
+   - Highest priority in search results
 
-4. **Archive when superseded** (`category: archive, status: deprecated`)
+4. **Archive** (`tags: [archive]` or `status: deprecated`, weight: 0.6)
    - Historical reference only
-   - Excluded from default retrieval
+
+### Tag Examples
+
+Both formats work - use inline hashtags OR array format:
+
+**Zettelkasten**:
+```yaml
+tags: #permanent-note #moc  # Inline (Obsidian-style)
+# OR
+tags: [permanent-note, moc]  # Array format
+```
+
+**PARA**:
+```yaml
+tags: #writerflow #mvp-1 #product-development  # Inline
+# OR
+tags: [writerflow, mvp-1, product-development]  # Array
+```
+
+**Domain Knowledge**:
+```yaml
+tags: #customer-research #validation #icp  # Inline
+# OR
+tags: [customer-research, validation, icp]  # Array
+```
+
+See `docs/TAG-WEIGHTING.md` and `docs/TAG-FORMAT.md` for complete documentation.
 
 ### ADR Pattern
 
-Create architectural decisions as canon:
+Create architectural decisions with authoritative tags:
 
+**Inline format:**
 ```yaml
 ---
-category: canon
+tags: #permanent-note #architecture-decision
 scope: mycompany
 type: decision
 status: active
 last_reviewed: 2026-01-20
 ---
+```
 
+**Or array format:**
+```yaml
+---
+tags: [permanent-note, architecture-decision]
+scope: mycompany
+type: decision
+status: active
+last_reviewed: 2026-01-20
+---
+```
 # ADR-001 — Use HNSW for Semantic Search
 
 ## Context
@@ -424,7 +475,7 @@ Use in-memory HNSW with SQLite as source of truth...
 ...
 ```
 
-All ADRs live in `@canon/decisions/`.
+All ADRs should use `tags: [permanent-note, architecture-decision]` for high search priority.
 
 ## Advanced Configuration
 
