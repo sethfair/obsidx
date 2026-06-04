@@ -11,7 +11,7 @@ Traditional search finds keywords. obsidx **understands your knowledge lifecycle
 - 🧠 **Permanent notes** are refined, authoritative insights (boosted)
 - 📖 **Literature notes** are structured, paraphrased sources (slightly boosted)
 - 💭 **Fleeting notes** are quick, unrefined captures (reduced)
-- 🗂️ **Superseded / deprecated** notes are excluded by default
+- 🗂️ **Superseded / deprecated** notes are down-weighted so fresher thinking ranks first
 
 This prevents AI agents from latching onto old drafts instead of your established thinking. Weights are fully configurable (`weights.json`) for whatever tag system you use — Zettelkasten, PARA, or your own.
 
@@ -330,12 +330,14 @@ last_reviewed: 2026-01-20
 
 ### Status Values
 
-| Status | Meaning | Default Filter |
-|--------|---------|----------------|
-| `active` | Current, in-use | ✅ Included |
-| `draft` | Work in progress | ✅ Included |
-| `superseded` | Replaced by newer | ❌ Excluded |
-| `deprecated` | No longer relevant | ❌ Excluded |
+| Status | Meaning | Effect on ranking |
+|--------|---------|-------------------|
+| `active` | Current, in-use | Full weight (1.0×) |
+| `draft` | Work in progress | Slightly reduced (0.9×) |
+| `superseded` | Replaced by newer | Down-weighted (0.5×) |
+| `deprecated` | No longer relevant | Down-weighted (0.5×) |
+
+> Status affects **weight**, not inclusion — superseded/deprecated notes still appear in results, just ranked lower. (Status weights are configurable in `weights.json`.)
 
 ### Scope
 
