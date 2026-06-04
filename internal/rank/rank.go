@@ -46,7 +46,8 @@ func RerankCosine(queryVec []float32, chunks []store.ChunkWithEmbedding, topN in
 	for i, chunk := range chunks {
 		baseSimilarity := CosineSimilarity(queryVec, chunk.Vec)
 
-		// Apply category weight (canon gets 1.20x, workbench gets 0.90x, etc.)
+		// Apply the tag-derived weight (e.g. permanent-note 1.3x, fleeting-notes 0.8x).
+		// CategoryWeight is computed from the note's tags via the weight config.
 		weightedScore := baseSimilarity * chunk.CategoryWeight
 
 		scores[i] = Result{
