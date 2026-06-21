@@ -364,27 +364,3 @@ func (s *SQLite) GetIndexMetaInt(ctx context.Context, key string) (int, error) {
 	}
 	return strconv.Atoi(val)
 }
-
-// GetCanonChunkIDs fetches only canon chunk IDs for priority retrieval
-func (s *SQLite) GetCanonChunkIDs(ctx context.Context, limit int) ([]uint64, error) {
-	query := `SELECT id FROM chunks 
-	          WHERE active = 1 AND category = 'canon' AND status = 'active'
-	          ORDER BY id
-	          LIMIT ?`
-
-	rows, err := s.db.QueryContext(ctx, query, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var ids []uint64
-	for rows.Next() {
-		var id uint64
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, rows.Err()
-}
