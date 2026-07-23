@@ -43,11 +43,11 @@ This prevents AI agents from latching onto old drafts instead of established dec
                            │
                            ▼
               ┌────────────────────────┐
-              │  HNSW Index (fast ANN) │
-              │  • In-memory graph     │
-              │  • Cosine distance     │
-              │  • Persistable         │
-              │  • Rebuildable         │
+              │  Exact Search Index    │
+              │  • In-memory, flat     │
+              │  • Cosine similarity   │
+              │  • Parallel full scan  │
+              │  • Rebuilt at startup  │
               └────────────────────────┘
                            │
                            ▼
@@ -61,34 +61,24 @@ This prevents AI agents from latching onto old drafts instead of established dec
 
 **Key Design Decisions:**
 
-- **SQLite is authoritative**: HNSW index is derived and rebuildable
+- **SQLite is authoritative**: the in-memory search index is derived and rebuilt at startup
 - **Soft deletes**: File changes mark old chunks inactive, not deleted
 - **Metadata inheritance**: All chunks inherit note-level category/scope/status
-- **Two-stage recall**: HNSW → candidates, then exact cosine with category weights
+- **Two-stage recall**: exact scan → candidates, then rerank with category weights
 
-### HNSW Technical Details
+### Search Index Details
 
-**Implementation:** Uses the [coder/hnsw](https://github.com/coder/hnsw) library for approximate nearest neighbor search.
+**Implementation:** exact brute-force cosine search (`internal/ann/brute.go`) — flat storage of L2-normalized vectors, parallel striped scan with per-worker top-k heaps, deterministic tie-breaking (similarity desc, chunk id asc).
 
 **Key Features:**
-- **Cosine Distance:** Measures semantic similarity via vector angles (1 - cosine_similarity)
-- **Thread-Safe:** Read-write locks protect concurrent access
-- **Incremental Updates:** Add vectors without full rebuild
-- **Persistent:** Save/load index to disk for fast startup
-- **Memory Efficient:** Hierarchical graph structure with configurable connectivity
+- **Exact by construction:** recall is always 100% — no graph pathologies possible
+- **Cosine Similarity:** vectors normalized once at insert; search is a pure dot product
+- **Thread-Safe:** read-write locks; the indexer can Add while the server Searches
+- **Zero-norm rejection:** unembeddable vectors are rejected at Add and query time
 
-**Search Algorithm:**
-1. Query vector enters at top layer
-2. Greedy search finds closest neighbors at each layer
-3. Descends through layers refining candidates
-4. Returns top-k results from base layer
-5. Results are re-ranked with exact cosine + category weights
+**Performance (measured 2026-07-23, ~80k chunks × 768 dims):** search stage 11–14 ms, total query ~45–60 ms including query embedding — within the <100 ms budget. Complexity is O(N × dim) per query; at ~10× current vault size revisit ANN (with the duplicate-vector caution from ADR-002 below).
 
-**Performance Characteristics:**
-- **Build Time:** O(N × log(N) × M × EfConstruction)
-- **Search Time:** O(log(N) × EfSearch)
-- **Memory:** O(N × M × layers)
-- **Accuracy:** ~95%+ recall@10 with default params
+> **History:** obsidx used [coder/hnsw](https://github.com/coder/hnsw) approximate search until 2026-07-23, when it was replaced after showing near-zero recall on real vault embeddings. See ADR-002 below.
 
 ## Quick Start
 
@@ -105,7 +95,7 @@ This automatically:
 - Starts Ollama if not running  
 - Downloads the embedding model if needed
 - Starts the indexer in watch mode (background)
-- Starts the search server with persistent HNSW index (background)
+- Starts the search server with the in-memory search index (background)
 
 **Search (instant, <100ms):**
 
@@ -157,7 +147,7 @@ go build -o bin/ ./cmd/...
 This creates:
 - `bin/obsidx-indexer` - watches vault and indexes changes
 - `bin/obsidx-recall` - semantic search with category awareness
-- `bin/obsidx-rebuild` - rebuilds HNSW from SQLite
+- `bin/obsidx-rebuild` - validates that all stored embeddings decode and load into a search index
 
 ### 2. Index Your Vault
 
@@ -190,7 +180,7 @@ The indexer:
 
 ### 3. Search
 
-The search server keeps the HNSW index loaded in memory for instant searches.
+The search server keeps the search index loaded in memory for instant searches.
 
 ```bash
 # Standard search (fast: <100ms)
@@ -458,7 +448,7 @@ status: active
 last_reviewed: 2026-01-20
 ---
 ```
-# ADR-001 — Use HNSW for Semantic Search
+# ADR-001 — Use HNSW for Semantic Search  [SUPERSEDED by ADR-002, 2026-07-23]
 
 ## Context
 We need fast semantic search over 100k+ note chunks...
@@ -472,37 +462,59 @@ Use in-memory HNSW with SQLite as source of truth...
 3. Pure vector similarity (no structure)
 
 ## Consequences
-...
+Superseded: see ADR-002.
+
+# ADR-002 — Exact Brute-Force Search Replaces HNSW (2026-07-23)
+
+## Context
+Two compounding failures surfaced on the production vault index:
+1. nomic-embed-text (via Ollama, both embed endpoints) collapses
+   heading-only lines to identical vectors — one constant vector per
+   heading level (`# A B` ≡ `# C D`; `## A B` ≡ `## C D`; …). ~5,765 such
+   chunks formed identical-vector clusters (largest: 1,063 nodes).
+2. coder/hnsw v0.6.1 (latest upstream) returned near-zero recall on the
+   vault's embeddings: identical-vector cliques trapped greedy search, and
+   even after the clusters were purged, brute-force ground truth put the
+   correct match (cosine 0.837) at rank 2 while the graph never returned
+   it at any candidate depth.
+
+## Decision
+- Skip heading-only chunks at embed time (`chunker.IsHeadingOnly`).
+- Replace HNSW with exact brute-force search (`ann.BruteForce`): at ~80k
+  chunks × 768 dims a parallel exact scan takes 11–14 ms — correct by
+  construction, well inside the <100 ms budget.
+
+## Remediation note (pre-fix databases)
+Databases indexed before this change still carry active heading-only
+chunks. The live DB was purged in place on 2026-07-23 (5,765 chunks
+marked inactive, matching the `IsHeadingOnly` predicate). A DB restored
+from an earlier backup must either be re-purged the same way or fully
+reindexed from scratch — otherwise recall silently regresses.
+
+## Consequences
+- 100% recall, deterministic results; no ANN tuning surface.
+- O(N × dim) per query; revisit ANN only if the vault grows ~10×, and
+  only with the duplicate-vector hazard above in mind.
 ```
 
 All ADRs should use `tags: [permanent-note, architecture-decision]` for high search priority.
 
 ## Advanced Configuration
 
-### HNSW Index Management
+### Search Index Management
 
-**Persistence:**
-The HNSW index can be saved to and loaded from disk for faster startup:
+The search index is **in-memory only** — it is rebuilt from SQLite every
+time a binary starts (a few seconds at current vault size). There is no
+on-disk index file and nothing to persist or invalidate.
 
 ```bash
-# The index is automatically saved/loaded from:
-.obsidian-index/<model_name>_<dim>.hnsw.bin
-
-# Force rebuild from SQLite (e.g., after config changes)
+# Validate that every stored embedding decodes and loads:
 ./bin/obsidx-rebuild --db .obsidian-index/obsidx.db --dim 768
 ```
 
-**When to rebuild:**
-- After changing HNSW parameters (M, EfConstruction, EfSearch)
-- After bulk imports or major vault changes
-- If index becomes corrupted
-- To optimize after many incremental updates
-
-**Index lifecycle:**
-1. `obsidx-indexer` builds HNSW incrementally during watch mode
-2. Index is persisted to `.hnsw.bin` on shutdown
-3. On startup, loads existing index (if compatible) or rebuilds
-4. Use `obsidx-rebuild` to force full reconstruction from SQLite
+`obsidx-rebuild` streams all active embeddings into a fresh index and
+reports progress; its index dies with the process. Use it as a data
+integrity check after bulk imports or suspected corruption.
 
 ### Tune Retrieval Weights
 
@@ -520,61 +532,12 @@ func (m *NoteMetadata) CategoryWeight() float32 {
 }
 ```
 
-### HNSW Parameters
+### Search Tuning
 
-The HNSW (Hierarchical Navigable Small World) index uses cosine distance for similarity and can be tuned for performance vs. accuracy trade-offs.
-
-**Default Configuration** (`internal/ann/hnsw.go`):
-
-```go
-func DefaultHNSWConfig(dim int) HNSWConfig {
-    return HNSWConfig{
-        Dim:            dim,  // Vector dimension (e.g., 768 for nomic-embed-text)
-        M:              16,   // Connections per layer (higher = better recall, more memory)
-        EfConstruction: 200,  // Build quality (higher = better index, slower build)
-        EfSearch:       100,  // Search quality (higher = better recall, slower search)
-    }
-}
-```
-
-**Tuning Guide:**
-
-| Parameter | Lower Value | Higher Value | Default |
-|-----------|-------------|--------------|---------|
-| `M` | Faster, less memory | Better recall, more memory | 16 |
-| `EfConstruction` | Faster indexing | Higher quality index | 200 |
-| `EfSearch` | Faster search | Better recall | 100 |
-
-**Common Configurations:**
-
-```go
-// Fast, lower quality (small vaults, speed critical)
-M: 8, EfConstruction: 100, EfSearch: 50
-
-// Balanced (default - recommended for most use cases)
-M: 16, EfConstruction: 200, EfSearch: 100
-
-// High quality (large vaults, accuracy critical)
-M: 32, EfConstruction: 256, EfSearch: 128
-```
-
-**Distance Metric:**
-
-obsidx uses **cosine distance** (1 - cosine_similarity) for text embeddings:
-- Normalized vectors (angles matter, magnitude doesn't)
-- Range: 0 (identical) to 2 (opposite)
-- Optimal for semantic similarity
-
-To customize, edit `internal/ann/hnsw.go`:
-
-```go
-// Current implementation
-graph.Distance = cosineDistance
-
-// Could swap for:
-// - euclideanDistance (L2 norm)
-// - dotProductDistance (unnormalized similarity)
-```
+There are no ANN parameters to tune — search is exact. The only knobs are
+`top_n` (results returned, default 12) and `candidate_k` (candidates
+fetched for reranking, default 200) on the `/search` API, and the category
+weights below.
 
 ### Custom Categories
 
@@ -617,8 +580,7 @@ cd ~
 **Structure:**
 ```
 .obsidian-index/
-├── obsidx.db           # SQLite database (all chunks + embeddings + metadata)
-└── hnsw/               # HNSW index files (rebuilt from SQLite as needed)
+└── obsidx.db           # SQLite database (all chunks + embeddings + metadata)
 ```
 
 **Key Points:**
@@ -788,10 +750,10 @@ status: active
 That's it. It gets 20% boost in retrieval.
 
 **Q: What happens when I edit a canon note?**  
-File change triggers reindex. Old chunks marked inactive, new chunks inserted. HNSW index handles additions incrementally.
+File change triggers reindex. Old chunks marked inactive, new chunks inserted. The in-memory index picks up additions incrementally; a restart rebuilds it from SQLite.
 
 **Q: How big can my vault be?**  
-The HNSW index efficiently handles 100k+ chunks with sub-millisecond search times. The cosine distance metric and hierarchical graph structure provide O(log N) search complexity. For vaults over 1M chunks, consider tuning EfSearch for the speed/accuracy trade-off you need.
+The exact scan handles the current ~80k chunks in 11-14 ms per query (measured 2026-07-23) and scales linearly, so ~10x the vault size stays comfortably interactive. Beyond that, revisit approximate search — with the duplicate-vector hazard documented in ADR-002 in mind.
 
 ## Contributing
 
@@ -810,7 +772,6 @@ MIT
 **Built with:**
 - Go 1.21+
 - SQLite (via mattn/go-sqlite3)
-- [coder/hnsw](https://github.com/coder/hnsw) - Hierarchical Navigable Small World graphs
-- Ollama (optional, for embeddings)
+- Ollama (for embeddings)
 
 **Philosophy:** Your knowledge base should reflect reality: some things are canon, some are drafts, some are experiments. The retrieval system should honor that hierarchy.

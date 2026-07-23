@@ -22,7 +22,6 @@ import (
 var (
 	vaultDir     = flag.String("vault", "", "Path to Obsidian vault (required)")
 	dbPath       = flag.String("db", ".obsidian-index/obsidx.db", "Path to SQLite database")
-	indexDir     = flag.String("index", ".obsidian-index/hnsw", "Path to HNSW index directory")
 	weightConfig = flag.String("weights", ".obsidian-index/weights.json", "Path to weight configuration file")
 	ollamaURL    = flag.String("ollama-url", "http://localhost:11434", "Ollama API endpoint")
 	embedModel   = flag.String("model", "nomic-embed-text", "Ollama embedding model (nomic-embed-text, all-minilm, etc)")
@@ -37,12 +36,9 @@ func main() {
 		log.Fatal("--vault is required")
 	}
 
-	// Ensure index directory exists
+	// Ensure db directory exists
 	if err := os.MkdirAll(filepath.Dir(*dbPath), 0755); err != nil {
 		log.Fatalf("Create db directory: %v", err)
-	}
-	if err := os.MkdirAll(*indexDir, 0755); err != nil {
-		log.Fatalf("Create index directory: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -84,12 +80,8 @@ func main() {
 	}
 	defer st.Close()
 
-	// Initialize ANN index
-	annCfg := ann.DefaultHNSWConfig(actualDim)
-	annIndex, err := ann.NewHNSW(annCfg)
-	if err != nil {
-		log.Fatalf("Create ANN index: %v", err)
-	}
+	// Initialize ANN index (exact scan — see ann.BruteForce doc comment)
+	annIndex := ann.NewBruteForce(actualDim)
 	defer annIndex.Close()
 
 	// Check if we need to rebuild index
@@ -197,8 +189,8 @@ func checkAndRebuild(ctx context.Context, st *store.SQLite, annIndex ann.Index, 
 		return rebuildIndex(ctx, st, annIndex, dim, model)
 	}
 
-	// Load existing vectors into HNSW
-	log.Println("Loading existing embeddings into HNSW...")
+	// Load existing vectors into the search index
+	log.Println("Loading existing embeddings into search index...")
 	rows, err := st.StreamActiveEmbeddings(ctx)
 	if err != nil {
 		return fmt.Errorf("stream embeddings: %w", err)
@@ -218,8 +210,11 @@ func checkAndRebuild(ctx context.Context, st *store.SQLite, annIndex ann.Index, 
 			return fmt.Errorf("decode vec: %w", err)
 		}
 
+		// Skip unloadable rows (e.g. zero-norm vectors in an old database)
+		// instead of aborting startup; log so they get noticed.
 		if err := annIndex.Add(id, vec); err != nil {
-			return fmt.Errorf("add to index: %w", err)
+			log.Printf("Skipping chunk %d: %v", id, err)
+			continue
 		}
 		count++
 
@@ -228,13 +223,13 @@ func checkAndRebuild(ctx context.Context, st *store.SQLite, annIndex ann.Index, 
 		}
 	}
 
-	log.Printf("Loaded %d vectors into HNSW\n", count)
+	log.Printf("Loaded %d vectors into search index\n", count)
 	return nil
 }
 
-// rebuildIndex rebuilds the HNSW index from SQLite
+// rebuildIndex rebuilds the search index from SQLite
 func rebuildIndex(ctx context.Context, st *store.SQLite, annIndex ann.Index, dim int, model string) error {
-	log.Println("Rebuilding HNSW index from SQLite...")
+	log.Println("Rebuilding search index from SQLite...")
 
 	rows, err := st.StreamActiveEmbeddings(ctx)
 	if err != nil {
@@ -255,8 +250,11 @@ func rebuildIndex(ctx context.Context, st *store.SQLite, annIndex ann.Index, dim
 			return fmt.Errorf("decode vec: %w", err)
 		}
 
+		// Skip unloadable rows (e.g. zero-norm vectors in an old database)
+		// instead of aborting startup; log so they get noticed.
 		if err := annIndex.Add(id, vec); err != nil {
-			return fmt.Errorf("add to index: %w", err)
+			log.Printf("Skipping chunk %d: %v", id, err)
+			continue
 		}
 		count++
 

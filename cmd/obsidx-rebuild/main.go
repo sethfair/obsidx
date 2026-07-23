@@ -29,12 +29,8 @@ func main() {
 	}
 	defer st.Close()
 
-	// Initialize ANN index
-	annCfg := ann.DefaultHNSWConfig(*dimension)
-	annIndex, err := ann.NewHNSW(annCfg)
-	if err != nil {
-		log.Fatalf("Create ANN index: %v", err)
-	}
+	// Initialize ANN index (exact scan — see ann.BruteForce doc comment)
+	annIndex := ann.NewBruteForce(*dimension)
 	defer annIndex.Close()
 
 	// Rebuild
@@ -78,8 +74,10 @@ func rebuild(ctx context.Context, st *store.SQLite, annIndex ann.Index) error {
 			return fmt.Errorf("decode vec for chunk %d: %w", id, err)
 		}
 
+		// Skip unloadable rows (e.g. zero-norm vectors) but keep validating the rest.
 		if err := annIndex.Add(id, vec); err != nil {
-			return fmt.Errorf("add chunk %d to index: %w", id, err)
+			log.Printf("Skipping chunk %d: %v", id, err)
+			continue
 		}
 
 		count++

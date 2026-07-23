@@ -76,10 +76,10 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 	// Calculate weight from tags and status
 	categoryWeight := noteMeta.CalculateWeight(idx.weightConfig)
 
+	// NOTE: an empty chunk list must NOT short-circuit here — a file edited
+	// down to nothing still needs its old chunks deactivated and its hash
+	// recorded, or search serves deleted content forever (see the tx below).
 	chunks := chunker.ChunkMarkdown(contentStr)
-	if len(chunks) == 0 {
-		return nil // Empty file
-	}
 
 	// Apply metadata to all chunks
 	for i := range chunks {
@@ -106,6 +106,13 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 			continue
 		}
 
+		// Skip heading-only chunks — they have no body to embed, and their
+		// (identical) vectors poisoned the previously-used HNSW graph and
+		// would degrade any graph-ANN. See chunker.IsHeadingOnly.
+		if chunker.IsHeadingOnly(trimmed) {
+			continue
+		}
+
 		vec, err := idx.embedder.Embed(ctx, chunk.Content)
 		if err != nil {
 			// Log but continue with other chunks
@@ -113,9 +120,19 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 			continue
 		}
 
-		// Skip empty embeddings
+		// Skip empty or zero-norm embeddings — both mean the embedder
+		// produced nothing usable, and ann.BruteForce.Add rejects zero-norm
+		// vectors outright.
 		if len(vec) == 0 {
 			fmt.Printf("  Warning: empty embedding for chunk %d, skipping\n", i)
+			continue
+		}
+		var normSq float32
+		for _, x := range vec {
+			normSq += x * x
+		}
+		if normSq == 0 {
+			fmt.Printf("  Warning: zero-norm embedding for chunk %d, skipping\n", i)
 			continue
 		}
 
@@ -126,9 +143,10 @@ func (idx *Indexer) IndexFile(ctx context.Context, path string) error {
 		})
 	}
 
-	if len(validChunks) == 0 {
-		return nil // No valid chunks to index
-	}
+	// Proceed even with zero valid chunks: the transaction below must still
+	// deactivate this file's old chunks and upsert FileInfo. Returning early
+	// here left stale chunks active and forced a re-read of the file on
+	// every pass (its hash was never recorded).
 
 	// Store in SQLite with transaction
 	tx, err := idx.store.BeginTx(ctx)

@@ -107,13 +107,11 @@ func main() {
 	}
 	log.Printf("✓ Connected to Ollama")
 
-	// Build HNSW index (one time!)
-	log.Printf("🏗️  Building HNSW index...")
-	annCfg := ann.DefaultHNSWConfig(storedDim)
-	annIndex, err := ann.NewHNSW(annCfg)
-	if err != nil {
-		log.Fatalf("Failed to create HNSW index: %v", err)
-	}
+	// Build exact-search index (one time!). Exact scan replaced HNSW after
+	// the graph showed near-zero recall on this vault's embeddings — see
+	// ann.BruteForce doc comment.
+	log.Printf("🏗️  Building exact-search index...")
+	annIndex := ann.NewBruteForce(storedDim)
 	defer annIndex.Close()
 
 	// Load vectors from SQLite
@@ -177,11 +175,12 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Defaults
-	if req.TopN == 0 {
+	// Defaults (clamp non-positive values too — a negative k would silently
+	// return an empty result set)
+	if req.TopN <= 0 {
 		req.TopN = 12
 	}
-	if req.CandidateK == 0 {
+	if req.CandidateK <= 0 {
 		req.CandidateK = 200
 	}
 
@@ -196,7 +195,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	timing.EmbedMs = time.Since(embedStart).Milliseconds()
 
-	// 2. HNSW search
+	// 2. Exact nearest-neighbor search
 	searchStart := time.Now()
 	candidateIDs, err := s.annIndex.Search(queryVec, req.CandidateK)
 	if err != nil {
@@ -308,8 +307,11 @@ func loadIndex(ctx context.Context, st *store.SQLite, annIndex ann.Index) error 
 			return fmt.Errorf("decode vec: %w", err)
 		}
 
+		// Skip unloadable rows (e.g. zero-norm vectors in a pre-2026-07-23
+		// database) instead of refusing to start; log so they get noticed.
 		if err := annIndex.Add(id, vec); err != nil {
-			return fmt.Errorf("add to index: %w", err)
+			log.Printf("   Skipping chunk %d: %v", id, err)
+			continue
 		}
 		count++
 
@@ -319,6 +321,6 @@ func loadIndex(ctx context.Context, st *store.SQLite, annIndex ann.Index) error 
 		}
 	}
 
-	log.Printf("✓ Loaded %d vectors into HNSW index", count)
+	log.Printf("✓ Loaded %d vectors into search index", count)
 	return nil
 }

@@ -22,6 +22,55 @@ type Chunk struct {
 	Tags           []string // Tags from frontmatter (e.g., #permanent-note, #writerflow)
 }
 
+// IsHeadingOnly reports whether content has no body text: every non-blank
+// line is either #-prefixed (ATX headings, but also Obsidian tag lines like
+// "#permanent-note #writerflow" — both are equally unembeddable) or a
+// horizontal rule. Such chunks carry no embeddable content — nomic-embed-text
+// collapses "## Word Word" lines to identical vectors, and thousands of
+// identical vectors form cliques in the HNSW graph that trap greedy search
+// (observed 2026-07-23: searches could only reach ~200 clique nodes out
+// of an 85k-vector index). Callers should skip these chunks at embed time.
+//
+// Note: lines are trimmed before the # check, so an indented "# shell
+// comment" inside an unfenced code block also matches. Accepted trade-off —
+// aligning with ChunkMarkdown's untrimmed heading detection is not worth
+// keeping such fragments in the index.
+func IsHeadingOnly(content string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if isHorizontalRule(trimmed) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// isHorizontalRule matches markdown thematic breaks: 3+ of the same marker
+// char (-, *, _), optionally space-separated ("---", "-----", "- - -").
+func isHorizontalRule(trimmed string) bool {
+	compact := strings.ReplaceAll(trimmed, " ", "")
+	if len(compact) < 3 {
+		return false
+	}
+	marker := compact[0]
+	if marker != '-' && marker != '*' && marker != '_' {
+		return false
+	}
+	for i := 1; i < len(compact); i++ {
+		if compact[i] != marker {
+			return false
+		}
+	}
+	return true
+}
+
 // ChunkMarkdown splits markdown into semantic chunks
 // Strategy: chunk by headings, keeping reasonable size limits
 func ChunkMarkdown(markdown string) []Chunk {
